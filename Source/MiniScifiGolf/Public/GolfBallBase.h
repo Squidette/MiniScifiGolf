@@ -24,16 +24,18 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 public:
-	// Ball's appearance
 	UPROPERTY(EditAnywhere)
 	class USphereComponent* SphereComp;
+	
+	UPROPERTY(EditAnywhere, Category = Projectile)
+	FRotator HitDirection;
+
+	UPROPERTY(EditAnywhere, Category = Projectile)
+	float HitForce;
 
 	UPROPERTY(EditAnywhere)
 	class UStaticMeshComponent* StaticMeshComp;
 	
-	UPROPERTY(EditAnywhere)
-	FRotator HitDirection;
-
-	UPROPERTY(EditAnywhere)
-	float HitForce;
+	UFUNCTION()
+	void Shot();
 };
