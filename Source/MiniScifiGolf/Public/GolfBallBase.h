@@ -29,6 +29,12 @@ public:
 	
 	UPROPERTY(EditAnywhere)
 	class UStaticMeshComponent* StaticMeshComp;
+
+	UPROPERTY(EditAnywhere)
+	class USpringArmComponent* SpringArmComp;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	class UCameraComponent* CameraComp;
 	
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
 	UPROPERTY(EditAnywhere)
@@ -37,13 +43,27 @@ public:
 	UPROPERTY(EditAnywhere)
 	FVector TorqueAmount; // 
 	
-	// MAGNUS EFFECT
+	// 마그누스 효과
 	UPROPERTY(EditAnywhere)
 	float MagnusScalar = 0.01f;
 
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_InAir = 0.05f;
+
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_AfterGroundHit = 0.85f;
+
+	UPROPERTY(EditAnywhere)
+	float AngularDamping_InAir = 0.05f;
+
+	UPROPERTY(EditAnywhere)
+	float AnglularDamping_AfterGroundHit = 0.05f;
+	
 	// 공 치기!
 	UFUNCTION()
 	void Shot();
+
+	bool HitGround = false;
 
 	// VISUALIZATION
 	UPROPERTY(EditAnywhere)
@@ -54,9 +74,15 @@ public:
 	
 	// 시뮬레이션용
 	bool simulated = false;
+
+	bool fasterSimulation = false;
 	
 	FTransform InitialTransform;
 	
 	UFUNCTION()
 	void ResetGolfBall();
+
+	UFUNCTION()
+	void OnFirstCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
 };

@@ -2,8 +2,12 @@
 
 
 #include "GolfBallBase.h"
+
+#include "Camera/CameraComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 #define GOLFBALLBASE_RADIUS 3.0f
 
@@ -19,8 +23,11 @@ AGolfBallBase::AGolfBallBase()
 		RootComponent = SphereComp;
 		SphereComp->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		SphereComp->SetSimulatePhysics(true);
+		SphereComp->SetNotifyRigidBodyCollision(true);
 		SphereComp->InitSphereRadius(GOLFBALLBASE_RADIUS);
 		SphereComp->SetUseCCD(true);
+		SphereComp->SetLinearDamping(LinearDamping_InAir);
+		SphereComp->SetAngularDamping(AngularDamping_InAir);
 	}
 
 	if (!StaticMeshComp)
@@ -32,6 +39,16 @@ AGolfBallBase::AGolfBallBase()
 		float meshScale = GOLFBALLBASE_RADIUS / 50.0f;
 		StaticMeshComp->SetRelativeScale3D(FVector(meshScale, meshScale, meshScale));
 	}
+
+	if (!SpringArmComp)
+	{
+		SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+		SpringArmComp->SetupAttachment(RootComponent);
+	}
+
+	// CameraComp
+	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	CameraComp->SetupAttachment(SpringArmComp);
 	
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshAsset(TEXT("Script/Engine.StaticMesh'/Engine/BasicShapes/Sphere.Sphere'"));
 	if (MeshAsset.Succeeded())
@@ -55,34 +72,65 @@ void AGolfBallBase::BeginPlay()
 void AGolfBallBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	// 마그누스 효과
+	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(), SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+	if (HitGround) MagnusForce.Z = 0.0f; // 땅에 구를때는 이거라도 없애줘야 그나마 자연스러워진다
+	SphereComp->AddForce(MagnusForce);
 
+	
 	// 시뮬레이션용
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
-		if (!simulated && PC->WasInputKeyJustPressed(EKeys::S))
+		// 샷
+		if (!simulated && PC->WasInputKeyJustPressed(EKeys::P))
 		{
 			Shot();
 			simulated = true;
 		}
 
+		// 리셋
 		if (PC->WasInputKeyJustPressed(EKeys::R))
 		{
 			ResetGolfBall();
 			UE_LOG(LogTemp, Warning, TEXT("Reset"));
 			simulated = false;
 		}
+
+		// 시간 가속
+		if (PC->WasInputKeyJustPressed(EKeys::T))
+		{
+			if (fasterSimulation)
+			{
+				UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+				fasterSimulation = false;
+			}
+			else
+			{
+				UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 6.0f);
+				fasterSimulation = true;
+			}
+		}
+
+		//
+		if (PC->WasInputKeyJustPressed(EKeys::NumPadOne))
+		{
+			// Camera 1
+		}
 	}
 
-	// MAGNUS
-	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(), SphereComp->GetPhysicsAngularVelocityInDegrees() * MagnusScalar);
-	SphereComp->AddForce(MagnusForce);
-	
+	DrawDebugString(GetWorld(), GetActorLocation(), MagnusForce.ToString(), nullptr, FColor::Magenta, 0, true, 2);
 }
 
 void AGolfBallBase::Shot()
 {
 	SphereComp->AddImpulse(ImpulseAmount, TEXT("None"), false);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
+
+	if (SphereComp)
+	{
+		SphereComp->OnComponentHit.AddDynamic(this, &AGolfBallBase::OnFirstCollision);
+	}
 }
 
 void AGolfBallBase::Visualize()
@@ -100,4 +148,22 @@ void AGolfBallBase::ResetGolfBall()
 	//SphereComp->ComponentVelocity = FVector(0, 0, 0);
 	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
 	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
+}
+
+void AGolfBallBase::OnFirstCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (!HitGround)
+	{
+		// 비거리 측정
+		UE_LOG(LogTemp, Warning, TEXT("collision: %f, %f, %f"), Hit.Location.X, Hit.Location.Y, Hit.Location.Z);
+
+		if (SphereComp)
+		{
+			SphereComp->SetLinearDamping(LinearDamping_AfterGroundHit);
+			SphereComp->SetAngularDamping(AnglularDamping_AfterGroundHit);
+		}
+		
+		HitGround = true;
+	}
 }
