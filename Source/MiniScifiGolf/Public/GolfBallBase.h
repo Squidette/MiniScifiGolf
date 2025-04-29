@@ -24,6 +24,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 public:
+	// 기본 컴포넌트
 	UPROPERTY(EditAnywhere)
 	class USphereComponent* SphereComp;
 	
@@ -37,52 +38,86 @@ public:
 	class UCameraComponent* CameraComp;
 	
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
+	UPROPERTY(EditAnywhere) // 발사각, 0~90사이
+	float LaunchAngleDegree = 40.0f;
+
 	UPROPERTY(EditAnywhere)
-	FVector ImpulseAmount; // 세기
+	float LaunchFullForce = 950.0f; // 100% 힘의 세기
+
+	UPROPERTY(EditAnywhere) // 0~1
+	float ForceScalar = 1.0f; // 100% 힘의 세기
+	
+	FVector ImpulseAmount; // 벡터로 변환된 공 발사방향
 
 	UPROPERTY(EditAnywhere)
 	FVector TorqueAmount; // 
 	
-	// 마그누스 효과
+	// 마그누스 효과 관련
 	UPROPERTY(EditAnywhere)
 	float MagnusScalar = 0.01f;
-
-	UPROPERTY(EditAnywhere)
-	float LinearDamping_InAir = 0.05f;
-
-	UPROPERTY(EditAnywhere)
-	float LinearDamping_AfterGroundHit = 0.85f;
-
-	UPROPERTY(EditAnywhere)
-	float AngularDamping_InAir = 0.05f;
-
-	UPROPERTY(EditAnywhere)
-	float AnglularDamping_AfterGroundHit = 0.05f;
 	
-	// 공 치기!
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_Initial = 0.6f;
+
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_Rolling = 0.6f;
+
+	UPROPERTY(EditAnywhere)
+	float AngularDamping_Initial = 0.05f;
+
+	UPROPERTY(EditAnywhere)
+	float AnglularDamping_Rolling = 0.05f;
+
+	// 공의 상태: IsSimulated, IsRolling, HasStopped가 차례대로 true가 되며 끝난다
+	bool IsSimulated = false;
+
+	// 공 치기
 	UFUNCTION()
-	void Shot();
+	void Launch();
 
-	bool HitGround = false;
+	/// 샷 이후 공이 처음으로 땅에 닿았는지 여부
+	bool HasBallHitGround = false;
 
-	// VISUALIZATION
+	// 공이 땅에 닿을 때 감속 분모
+	UPROPERTY(EditAnywhere)
+	float HitGroundXYVelocityDecelerationRate = 1.8f;
+
+	UPROPERTY(EditAnywhere)
+	float HitGroundZVelocityDecelerationRate = 1.0f;
+	
+	// 해당 프레임수 이상 연속으로 감속하지 않는다
+	UPROPERTY(EditAnywhere)
+	int HitGroundDecelerationLimitFrame = 1;
+
+	// 해당 프레임 이상 연속으로 collision이면 구르는 상태로 판정
+	UPROPERTY(EditAnywhere)
+	int ConsecutiveCollisionFramesForRoll = 200;
+	
+	bool IsRolling = false;
+
+	// 공의 정지
+	UPROPERTY(EditAnywhere)
+	float StopVelocityTheshold = 35.0f;
+	
+	bool HasStopped = false;
+
+	// 충돌 연속 체크 확인용 변수
+	bool BallHitGroundLastFrame = false;
+	int ConsecutiveCollision = 0; //HitGroundDecelerationLimitFrame을 넘으면 더이상 감속하지 않는다
+	
+	UFUNCTION()
+	void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+	
+	// 시뮬레이션용
 	UPROPERTY(EditAnywhere)
 	float VisualizationCycle = 0.02f;
 	FTimerHandle VisualizationHandle;
 	FVector LastLocation;
 	void Visualize();
 	
-	// 시뮬레이션용
-	bool simulated = false;
-
 	bool fasterSimulation = false;
-	
 	FTransform InitialTransform;
 	
 	UFUNCTION()
 	void ResetGolfBall();
-
-	UFUNCTION()
-	void OnFirstCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-
 };
