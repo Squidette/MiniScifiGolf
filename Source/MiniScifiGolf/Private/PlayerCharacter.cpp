@@ -52,7 +52,7 @@ void APlayerCharacter::BeginPlay()
 	
 	auto* subsys = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
 		GetWorld()->GetFirstPlayerController()->GetLocalPlayer());
-
+	
 	if (subsys) { subsys->AddMappingContext(IMC_GolfControl, 0); }
 }
 

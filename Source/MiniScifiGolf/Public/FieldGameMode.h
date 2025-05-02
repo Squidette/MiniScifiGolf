@@ -15,7 +15,8 @@ enum class ECameraMode : uint8
 {
 	PLAYER,
 	BALL,
-	MAP
+	MAP,
+	NONE // 끝
 };
 
 UCLASS()
@@ -25,8 +26,25 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 
 	virtual void BeginPlay() override;
 	
-	ECameraMode CurrentCameraState;
+	ECameraMode CurrentCameraState = ECameraMode::NONE;
+
+
+	// these are game mode base properties. how do you get these cameras, when instance is not in level editor but gamemodebase is instantiated upon playing?
+	UPROPERTY(EditAnywhere)
+	class ACameraActor* PlayerCamera;
+
+	UPROPERTY(EditAnywhere)
+	class ACameraActor* BallCamera;
+
+	UPROPERTY(EditAnywhere)
+	class ACameraActor* MapCamera;
 
 public:
 	bool SetCameraMode(ECameraMode mode);
+
+private:
+	UPROPERTY(EditAnywhere)
+	APlayerController* PlayerController;
+
+	ACameraActor* GetCameraActorByMode(ECameraMode mode) const;
 };
