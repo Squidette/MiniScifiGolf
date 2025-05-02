@@ -1,15 +1,25 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "FieldGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraActor.h"
+#include "PlayerCamera.h"
+#include "EngineUtils.h"
 #include "../MiniScifiGolf.h"
 
 void AFieldGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
+	for (TActorIterator<APlayerCamera> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Camera.Player"))))
+		{
+			PlayerCamera = Cast<ACameraActor>(*It);
+			break;
+		}
+	}
+	
 	PlayerController = UGameplayStatics::GetPlayerController(this, 0);
 	SetCameraMode(ECameraMode::PLAYER);
 }

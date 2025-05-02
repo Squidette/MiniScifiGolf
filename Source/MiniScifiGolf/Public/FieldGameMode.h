@@ -27,9 +27,7 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	virtual void BeginPlay() override;
 	
 	ECameraMode CurrentCameraState = ECameraMode::NONE;
-
-
-	// these are game mode base properties. how do you get these cameras, when instance is not in level editor but gamemodebase is instantiated upon playing?
+	
 	UPROPERTY(EditAnywhere)
 	class ACameraActor* PlayerCamera;
 
@@ -38,7 +36,7 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 
 	UPROPERTY(EditAnywhere)
 	class ACameraActor* MapCamera;
-
+	
 public:
 	bool SetCameraMode(ECameraMode mode);
 

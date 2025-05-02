@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Camera/CameraActor.h"
+#include "GameplayTagContainer.h"
 #include "PlayerCamera.generated.h"
 
 /**
@@ -14,7 +15,11 @@ class MINISCIFIGOLF_API APlayerCamera : public ACameraActor
 {
 	GENERATED_BODY()
 
+	UPROPERTY()
+	FGameplayTagContainer TagContainer;
+	
 public:
-	virtual void BeginPlay() override;
+	APlayerCamera();
 
+	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
 };

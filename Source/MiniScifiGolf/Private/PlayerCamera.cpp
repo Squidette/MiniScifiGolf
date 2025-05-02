@@ -3,7 +3,12 @@
 
 #include "PlayerCamera.h"
 
-void APlayerCamera::BeginPlay()
+APlayerCamera::APlayerCamera()
 {
-	Super::BeginPlay();
+	FGameplayTag playerCameraTag = FGameplayTag::RequestGameplayTag(FName("Camera.Player"));
+	
+	if (!TagContainer.HasTag(playerCameraTag))
+	{
+		TagContainer.AddTag(playerCameraTag);
+	}
 }
