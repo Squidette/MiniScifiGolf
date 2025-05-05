@@ -2,6 +2,7 @@
 
 #include "FieldGameMode.h"
 #include "Kismet/GameplayStatics.h"
+#include "FieldWidget.h"
 #include "Camera/CameraActor.h"
 #include "PlayerCamera.h"
 #include "EngineUtils.h"
@@ -11,6 +12,18 @@ void AFieldGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	// 위젯 생성
+	if (FieldWidgetFactory)
+	{
+		FieldWidget = Cast<UFieldWidget>(CreateWidget(GetWorld(), FieldWidgetFactory));
+
+		if (FieldWidget)
+		{
+			FieldWidget->AddToViewport();
+		}
+	}
+
+	// 태그로 플레이어 카메라 찾기
 	for (TActorIterator<APlayerCamera> It(GetWorld()); It; ++It)
 	{
 		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Camera.Player"))))
@@ -81,3 +94,5 @@ ACameraActor* AFieldGameMode::GetCameraActorByMode(ECameraMode mode) const
 		return nullptr;
 	}
 }
+
+

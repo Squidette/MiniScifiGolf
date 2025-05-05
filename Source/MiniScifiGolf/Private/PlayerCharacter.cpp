@@ -2,8 +2,11 @@
 
 
 #include "PlayerCharacter.h"
+#include "../MiniScifiGolf.h"
+#include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GolfBallBase.h"
 #include "InputMappingContext.h"
 
 // Sets default values
@@ -54,6 +57,21 @@ void APlayerCharacter::BeginPlay()
 		GetWorld()->GetFirstPlayerController()->GetLocalPlayer());
 	
 	if (subsys) { subsys->AddMappingContext(IMC_GolfControl, 0); }
+
+	// 태그로 공 찾기
+	for (TActorIterator<AGolfBallBase> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Ball"))))
+		{
+			Ball = Cast<AGolfBallBase>(*It);
+			break;
+		}
+	}
+
+	if (!Ball)
+	{
+		CUSTOMLOG(TEXT("%s"), TEXT("Player Cannot find ball"));
+	}
 }
 
 // Called every frame
@@ -93,25 +111,42 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 {
+	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("ShotInput"));
 }
 
 void APlayerCharacter::OnMapInput(const FInputActionValue& v)
 {
+	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("MapInput"));
 }
 
 void APlayerCharacter::OnTurnInput(const FInputActionValue& v)
 {
-	UE_LOG(LogTemp, Display, TEXT("TurnInput"));
+	if (CurrentState != EPlayerState::SHOTPREP) return;
+	//UE_LOG(LogTemp, Display, TEXT("TurnInput %f"), v.Get<float>());
+
+	if (Ball)
+	{
+		if (v.Get<float>() > 0)
+		{
+			Ball->TurnDirection(true);
+		}
+		else
+		{
+			Ball->TurnDirection(false);
+		}
+	}
 }
 
 void APlayerCharacter::OnLongerClubInput(const FInputActionValue& v)
 {
+	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("LongerClub"));
 }
 
 void APlayerCharacter::OnShorterClubInput(const FInputActionValue& v)
 {
+	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("ShorterClub"));
 }

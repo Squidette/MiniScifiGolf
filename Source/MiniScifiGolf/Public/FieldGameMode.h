@@ -26,8 +26,16 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 
 	virtual void BeginPlay() override;
 	
+	// UI
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class UUserWidget> FieldWidgetFactory;
+
+	UPROPERTY()
+	class UFieldWidget* FieldWidget;
+
+	// 카메라
 	ECameraMode CurrentCameraState = ECameraMode::NONE;
-	
+
 	UPROPERTY(EditAnywhere)
 	class ACameraActor* PlayerCamera;
 

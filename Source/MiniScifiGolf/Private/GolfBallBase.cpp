@@ -4,10 +4,13 @@
 #include "GolfBallBase.h"
 
 #include <string>
-
+#include "EngineUtils.h"
+#include "HoleCup.h"
+#include "../MiniScifiGolf.h"
 #include "Camera/CameraComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/ArrowComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -42,21 +45,36 @@ AGolfBallBase::AGolfBallBase()
 		StaticMeshComp->SetRelativeScale3D(FVector(meshScale, meshScale, meshScale));
 	}
 
-	if (!SpringArmComp)
+	if (!ArrowComp)
 	{
-		SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-		SpringArmComp->SetupAttachment(RootComponent);
+		ArrowComp = CreateDefaultSubobject<UArrowComponent>(TEXT("ArrowComp"));
+		ArrowComp->SetupAttachment(SphereComp);
+		ArrowComp->SetCollisionProfileName(TEXT("NoCollision"));
 	}
 
-	// CameraComp
-	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	CameraComp->SetupAttachment(SpringArmComp);
+	//if (!SpringArmComp)
+	//{
+	//	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+	//	SpringArmComp->SetupAttachment(RootComponent);
+	//}
+
+	//// CameraComp
+	//CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	//CameraComp->SetupAttachment(SpringArmComp);
 
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshAsset(
 		TEXT("Script/Engine.StaticMesh'/Engine/BasicShapes/Sphere.Sphere'"));
 	if (MeshAsset.Succeeded())
 	{
 		StaticMeshComp->SetStaticMesh(MeshAsset.Object);
+	}
+
+	// 공 태그 붙이기
+	FGameplayTag ballTag = FGameplayTag::RequestGameplayTag(FName("Ball"));
+
+	if (!TagContainer.HasTag(ballTag))
+	{
+		TagContainer.AddTag(ballTag);
 	}
 }
 
@@ -65,16 +83,41 @@ void AGolfBallBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 시뮬레이션용
 	InitialTransform = GetActorTransform();
-
 	LastLocation = GetActorLocation();
 	GetWorldTimerManager().SetTimer(VisualizationHandle, this, &AGolfBallBase::Visualize, VisualizationCycle, true);
 
-	// 발사각과 힘을 벡터로 변환
-	float LaunchAngleRadians = FMath::DegreesToRadians(LaunchAngleDegree);
-	float ForceX = LaunchFullForce * FMath::Cos(LaunchAngleRadians);
-	float ForceZ = LaunchFullForce * FMath::Sin(LaunchAngleRadians);
-	ImpulseAmount =  FVector(ForceX, 0.0f, ForceZ);
+	// 태그로 홀컵 찾기
+	for (TActorIterator<AHoleCup> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("HoleCup"))))
+		{
+			HoleCup = Cast<AHoleCup>(*It);
+			break;
+		}
+	}
+
+	if (!HoleCup)
+	{
+		CUSTOMLOG(TEXT("%s"), TEXT("Cannot find Holecup"));
+	}
+
+	//// 발사각과 힘을 벡터로 변환
+	//float LaunchAngleRadians = FMath::DegreesToRadians(LaunchAngleDegree);
+	//float ForceX = LaunchFullForce * FMath::Cos(LaunchAngleRadians);
+	//float ForceZ = LaunchFullForce * FMath::Sin(LaunchAngleRadians);
+	//ImpulseAmount =  FVector(ForceX, 0.0f, ForceZ);
+
+	// 현재 방향 설정
+	CurrentHeadVector = HoleCup->GetActorLocation() - GetActorLocation();
+	CurrentHeadVector.Z = 0;
+	CurrentHeadVector.Normalize();
+
+	// 현재 방향을 float 각도로 저장
+	FRotator Rot = CurrentHeadVector.Rotation();
+	CurrentHeadDegree = Rot.Yaw;
+	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
 }
 
 // Called every frame
@@ -130,25 +173,11 @@ void AGolfBallBase::Tick(float DeltaTime)
 			UE_LOG(LogTemp, Warning, TEXT("Reset"));
 		}
 
-		// 시간 가속
+		// test
 		if (PC->WasInputKeyJustPressed(EKeys::T))
 		{
-			if (fasterSimulation)
-			{
-				UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
-				fasterSimulation = false;
-			}
-			else
-			{
-				UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 6.0f);
-				fasterSimulation = true;
-			}
-		}
-
-		//
-		if (PC->WasInputKeyJustPressed(EKeys::NumPadOne))
-		{
-			// Camera 1
+			//ResetGolfBallRotation();
+			GetWorld()->GetDeltaSeconds();
 		}
 	}
 
@@ -158,8 +187,37 @@ void AGolfBallBase::Tick(float DeltaTime)
 	//DrawDebugString(GetWorld(), GetActorLocation(), SphereComp->GetComponentVelocity().ToString(), nullptr, FColor::Magenta, 0, true, 2);
 }
 
+float AGolfBallBase::TurnDirection(bool right)
+{
+	if (right)
+	{
+		CurrentHeadDegree += HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
+	}
+	else
+	{
+		CurrentHeadDegree -= HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
+	}
+
+	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
+
+	return 0.0f;
+}
+
 void AGolfBallBase::Launch()
 {
+	FRotator Rot(0.f, CurrentHeadDegree, 0.f);
+	CurrentHeadVector = Rot.Vector();
+
+	float LaunchAngleInRadians = FMath::DegreesToRadians(LaunchAngleDegree);
+	float VerticalComponent = FMath::Sin(LaunchAngleInRadians);
+	float HorizontalComponent = FMath::Cos(LaunchAngleInRadians);
+
+	FVector HorizontalDirection = CurrentHeadVector * HorizontalComponent;
+	FVector LaunchVelocityDirection = HorizontalDirection;
+	LaunchVelocityDirection.Z = VerticalComponent;
+
+	ImpulseAmount = LaunchVelocityDirection * LaunchFullForce;
+
 	FVector finalForce = ImpulseAmount * ForceScalar; // finalforce에 어떤 연산을 가해야 선형적이어진다
 	SphereComp->AddImpulse(finalForce, TEXT("None"), false);
 	SphereComp->AddTorqueInRadians(TorqueAmount);

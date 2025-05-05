@@ -3,15 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Camera/CameraActor.h"
+#include "CineCameraActor.h"
 #include "GameplayTagContainer.h"
 #include "PlayerCamera.generated.h"
 
 /**
  * 
  */
+
 UCLASS()
-class MINISCIFIGOLF_API APlayerCamera : public ACameraActor
+class MINISCIFIGOLF_API APlayerCamera : public ACineCameraActor
 {
 	GENERATED_BODY()
 
@@ -19,7 +20,7 @@ class MINISCIFIGOLF_API APlayerCamera : public ACameraActor
 	FGameplayTagContainer TagContainer;
 	
 public:
-	APlayerCamera();
+	APlayerCamera(const FObjectInitializer& ObjectInitializer);
 
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
 };

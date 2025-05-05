@@ -7,6 +7,17 @@
 #include "InputActionValue.h"
 #include "PlayerCharacter.generated.h"
 
+UENUM(BlueprintType)
+enum class EPlayerState : uint8
+{
+	PRESHOTMOTION,
+	SHOTPREP,
+	SHOT,
+	FLYBALL,
+	POSTSHOTMOTION,
+	 // ³¡
+};
+
 UCLASS()
 class MINISCIFIGOLF_API APlayerCharacter : public ACharacter
 {
@@ -51,4 +62,10 @@ public:
 	void OnTurnInput(const struct FInputActionValue& v);
 	void OnLongerClubInput(const struct FInputActionValue& v);
 	void OnShorterClubInput(const struct FInputActionValue& v);
+
+	UPROPERTY(EditAnywhere)
+	EPlayerState CurrentState = EPlayerState::SHOTPREP;
+
+	UPROPERTY(EditAnywhere)
+	class AGolfBallBase* Ball;
 };
