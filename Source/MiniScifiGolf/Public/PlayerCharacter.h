@@ -16,7 +16,7 @@ enum class EPlayerState : uint8
 	SHOT,
 	FLYBALL,
 	POSTSHOTMOTION,
-	 // ³¡
+	 // ï¿½ï¿½
 };
 
 class AFieldGameMode;
@@ -38,6 +38,11 @@ protected:
 
 private:
 	AFieldGameMode* FieldGameModeBase;
+
+	bool mapOpen = false;
+
+	bool OpenMap();
+	bool CloseMap();
 
 public:	
 	// Called every frame
@@ -65,11 +70,19 @@ public:
 	UPROPERTY(EditAnywhere)
 	class UInputAction* IA_ShorterClub;
 
+	UPROPERTY(EditAnywhere)
+	class UInputAction* IA_MapHorizontal;
+	
+	UPROPERTY(EditAnywhere)
+	class UInputAction* IA_MapVertical;
+	
 	void OnShotInput(const struct FInputActionValue& v);
 	void OnMapInput(const struct FInputActionValue& v);
 	void OnTurnInput(const struct FInputActionValue& v);
 	void OnLongerClubInput(const struct FInputActionValue& v);
 	void OnShorterClubInput(const struct FInputActionValue& v);
+	void OnMapHorizontalInput(const struct FInputActionValue& v);
+	void OnMapVerticalInput(const struct FInputActionValue& v);
 
 	UPROPERTY(EditAnywhere)
 	EPlayerState CurrentState = EPlayerState::SHOTPREP;

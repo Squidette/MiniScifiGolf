@@ -7,12 +7,13 @@
 #include "PlayerCamera.h"
 #include "BallCamera.h"
 #include "EngineUtils.h"
+#include "MapCamera.h"
 #include "../MiniScifiGolf.h"
 
 void AFieldGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// 위젯 생성
 	if (FieldWidgetFactory)
 	{
@@ -43,12 +44,22 @@ void AFieldGameMode::BeginPlay()
 			break;
 		}
 	}
-	
+
+	// 태그로 맵 카메라 찾기
+	for (TActorIterator<AMapCamera> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Camera.Map"))))
+		{
+			MapCamera = *It;
+			break;
+		}
+	}
+
 	PlayerController = UGameplayStatics::GetPlayerController(this, 0);
 	SetCameraMode(ECameraMode::PLAYER);
 }
 
-bool AFieldGameMode::SetCameraMode(ECameraMode mode)
+bool AFieldGameMode::CheckValidCamera(ECameraMode mode, AActor*& cameraActor)
 {
 	if (mode == CurrentCameraState)
 	{
@@ -68,27 +79,62 @@ bool AFieldGameMode::SetCameraMode(ECameraMode mode)
 		return false;
 	}
 
-	AActor* cameraActorToSwitch = Cast<AActor>(cameraToSwitch);
-	if (!cameraActorToSwitch)
+	cameraActor = Cast<AActor>(cameraToSwitch);
+	if (!cameraActor)
 	{
 		CUSTOMLOG(TEXT("%s"), TEXT("카메라를 액터로 전환실패"));
 		return false;
 	}
 
-	bool blend = true;
-
-	if (blend)
-	{
-		PlayerController->SetViewTargetWithBlend(cameraActorToSwitch, 1.0f, VTBlend_Cubic);
-	}
-	else
-	{
-		PlayerController->SetViewTarget(cameraActorToSwitch);
-	}
-
-	CurrentCameraState = mode;
-
 	return true;
+}
+
+bool AFieldGameMode::SetCameraMode(ECameraMode mode)
+{
+	AActor* cameraActorToSwitch = nullptr;
+
+	if (CheckValidCamera(mode, cameraActorToSwitch))
+	{
+		if (cameraActorToSwitch)
+		{
+			PlayerController->SetViewTarget(cameraActorToSwitch);
+			CurrentCameraState = mode;
+			return true;
+		}
+
+		CUSTOMLOG(TEXT("%s"), TEXT("cameraActorToSwitch was null"));
+		return false;
+	}
+	return false;
+}
+
+bool AFieldGameMode::SetCameraModeWithBlend(ECameraMode mode, float duration)
+{
+	AActor* cameraActorToSwitch = nullptr;
+
+	if (CheckValidCamera(mode, cameraActorToSwitch))
+	{
+		if (cameraActorToSwitch)
+		{
+			PlayerController->SetViewTargetWithBlend(cameraActorToSwitch, duration, VTBlend_Cubic);
+			CurrentCameraState = mode;
+			return true;
+		}
+
+		CUSTOMLOG(TEXT("%s"), TEXT("cameraActorToSwitch was null"));
+		return false;
+	}
+	return false;
+}
+
+void AFieldGameMode::MoveMapCameraVertical(float v)
+{
+	if (MapCamera) { MapCamera->MoveVertical(v); }
+}
+
+void AFieldGameMode::MoveMapCameraHorizontal(float v)
+{
+	if (MapCamera) { MapCamera->MoveHorizontal(v); }
 }
 
 ACameraActor* AFieldGameMode::GetCameraActorByMode(ECameraMode mode) const
@@ -100,10 +146,8 @@ ACameraActor* AFieldGameMode::GetCameraActorByMode(ECameraMode mode) const
 	case ECameraMode::BALL:
 		return BallCamera;
 	case ECameraMode::MAP:
-		return MapCamera;
+		return Cast<ACameraActor>(MapCamera);
 	default:
 		return nullptr;
 	}
 }
-
-

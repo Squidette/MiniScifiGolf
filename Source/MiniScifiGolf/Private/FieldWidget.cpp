@@ -14,6 +14,8 @@ UFieldWidget::UFieldWidget(const FObjectInitializer& ObjectInitializer)
 
 void UFieldWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	
 	if (ShotBarActivated)
 	{
 		UpdateShotBar(InDeltaTime);
@@ -66,7 +68,7 @@ void UFieldWidget::SetDirection()
 
 void UFieldWidget::UpdateShotBar(const float& dt)
 {
-	if (ShotBarDirection) // ¿Ã¶ó°¡±â
+	if (ShotBarDirection) // ï¿½Ã¶ó°¡±ï¿½
 	{
 		ShotBarValue += ShotBarSpeed * dt;
 
@@ -76,18 +78,18 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 			ShotBarDirection = false;
 		}
 	}
-	else // ³»·Á°¡±â
+	else // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	{
 		ShotBarValue -= ShotBarSpeed * dt;
 
-		// Å¸±¸¹Ù ³¡
+		// ìƒ·ì´ ëë‚˜ë©´ ìƒ· ì •ë³´ë¥¼ ë°œì†¡
 		if (ShotBarValue < 0.0f)
 		{
 			ShotBarValue = 0.0f;
 
 			ShotBarActivated = false;
 
-			UE_LOG(LogTemp, Warning, TEXT("Å¸±¸¹Ù: %f, %f"), PowerValue, DirectionValue);
+			UE_LOG(LogTemp, Warning, TEXT("Å¸ï¿½ï¿½ï¿½ï¿½: %f, %f"), PowerValue, DirectionValue);
 			OnShotMade.Execute(PowerValue, DirectionValue);
 
 			ShotBarDirection = true;

@@ -6,7 +6,7 @@
 APlayerCamera::APlayerCamera(const FObjectInitializer& ObjectInitializer)
 	: ACineCameraActor(ObjectInitializer)
 {
-	// ÇÃ·¹ÀÌ¾î Ä«¸Ş¶ó ÅÂ±× ºÙÀÌ±â
+	// í”Œë ˆì´ì–´ ì¹´ë©”ë¼ íƒœê·¸ ë¶™ì´ê¸°
 	FGameplayTag playerCameraTag = FGameplayTag::RequestGameplayTag(FName("Camera.Player"));
 
 	if (!TagContainer.HasTag(playerCameraTag))

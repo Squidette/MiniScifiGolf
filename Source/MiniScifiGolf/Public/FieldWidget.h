@@ -15,11 +15,8 @@ UCLASS()
 class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 {
 	GENERATED_BODY()
-
-	//UPROPERTY(meta = (BindWidget))
-	//class UTextBlock* TextHighScore;
-
-	// Å¸±¸¹Ù
+	
+	// Å¸ï¿½ï¿½ï¿½ï¿½
 	UPROPERTY(meta = (BindWidget))
 	class UProgressBar* ShotBar;
 
@@ -29,19 +26,19 @@ class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 	UPROPERTY(EditAnywhere)
 	float ShotBarValue;
 
-	// Â÷·Ê·Î true°¡ µÈ´Ù
+	// ï¿½ï¿½ï¿½Ê·ï¿½ trueï¿½ï¿½ ï¿½È´ï¿½
 	bool ShotBarActivated = false;
 	bool PowerSet = false;
 	bool DirectionSet = false;
 
 	bool ShotBarDirection = true; //true: up, false: down
 
-	// Å¸±¸¹Ù¿¡¼­ Á¤ÇØÁö´Â °ª
+	// Å¸ï¿½ï¿½ï¿½Ù¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
 	
-	// 0.0f~1.0f (Á¤»ó°ª), -1.0f (¾øÀ½), 
+	// 0.0f~1.0f (ï¿½ï¿½ï¿½ï¿½), -1.0f (ï¿½ï¿½ï¿½ï¿½), 
 	float PowerValue = -1.0f; 
 
-	// -1.0f~1.0f (Á¤»ó°ª), -1.0f (¾øÀ½), < -5.0f (½ÇÆÐ)
+	// -1.0f~1.0f (ï¿½ï¿½ï¿½ï¿½), -1.0f (ï¿½ï¿½ï¿½ï¿½), < -5.0f (ï¿½ï¿½ï¿½ï¿½)
 	float DirectionValue = -1.0f;
 
 public:
@@ -49,14 +46,14 @@ public:
 
 	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	// ÀÌº¥Æ®
+	// ï¿½Ìºï¿½Æ®
 	UPROPERTY()
 	FOnShotSignature OnShotMade;
 
 	UFUNCTION()
 	void PressShotBar();
 
-	// ¼¦¿¡ ÇÊ¿äÇÑ ¼¼ °¡Áö ÀÎÇ²
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç²
 	UFUNCTION()
 	void ActivateShotBar();
 
@@ -67,4 +64,6 @@ public:
 	void SetDirection();
 
 	void UpdateShotBar(const float& dt);
+
+	inline bool GetShotBarActivated() const { return ShotBarActivated; }
 };

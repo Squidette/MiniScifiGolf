@@ -9,25 +9,20 @@
 ABallCamera::ABallCamera(const FObjectInitializer& ObjectInitializer)
 	: ACineCameraActor(ObjectInitializer)
 {
-	// °ø Ä«¸Ş¶ó ÅÂ±× ºÙÀÌ±â
-	FGameplayTag playerCameraTag = FGameplayTag::RequestGameplayTag(FName("Camera.Ball"));
+	// ê³µ ì¹´ë©”ë¼ íƒœê·¸ ë¶™ì´ê¸°
+	FGameplayTag ballCameraTag = FGameplayTag::RequestGameplayTag(FName("Camera.Ball"));
 
-	if (!TagContainer.HasTag(playerCameraTag))
+	if (!TagContainer.HasTag(ballCameraTag))
 	{
-		TagContainer.AddTag(playerCameraTag);
+		TagContainer.AddTag(ballCameraTag);
 	}
 }
-
-// just look at the whole beginplay code.
-// this code builds well, but if I add a if (Ball) statement after it, even without any content in it, it will lead to build error.
-
-// wtf?
 
 void ABallCamera::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// ÅÂ±×·Î °ø Ã£±â
+	// íƒœê·¸ë¡œ ê³µ ì°¾ê¸°
 	AGolfBallBase* Ball = nullptr;
 
 	for (TActorIterator<AGolfBallBase> It(GetWorld()); It; ++It)
@@ -39,7 +34,7 @@ void ABallCamera::BeginPlay()
 		}
 	}
 
-	//°øÀ» Ã£¾Ò´Ù¸é °øÀÇ SpringArm¿¡ ºÙ±â
+	//ê³µì„ ì°¾ì•˜ë‹¤ë©´ ê³µì˜ SpringArmì— ë¶™ê¸°
 	if (Ball)
 	{
 		if (Ball->SpringArmComp)

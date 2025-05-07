@@ -7,6 +7,8 @@
 #include "GameplayTagContainer.h"
 #include "GolfBallBase.generated.h"
 
+DECLARE_DYNAMIC_DELEGATE(FOnBallStopped);
+
 UCLASS()
 class MINISCIFIGOLF_API AGolfBallBase : public AActor
 {
@@ -124,6 +126,9 @@ public:
 	float StopVelocityTheshold = 35.0f;
 
 	bool HasStopped = false;
+
+	UPROPERTY()
+	FOnBallStopped OnBallStopped;
 
 	// 충돌 연속 체크 확인용 변수
 	bool BallHitGroundLastFrame = false;

@@ -48,6 +48,14 @@ APlayerCharacter::APlayerCharacter()
 	ConstructorHelpers::FObjectFinder<UInputAction> shorterClubInputAction(
 		TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_ShorterClub.IA_ShorterClub'"));
 	if (shorterClubInputAction.Succeeded()) IA_ShorterClub = shorterClubInputAction.Object;
+
+	ConstructorHelpers::FObjectFinder<UInputAction> mapHorizontalInputAction(
+	TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapHorizontal.IA_MapHorizontal'"));
+	if (mapHorizontalInputAction.Succeeded()) IA_MapHorizontal = mapHorizontalInputAction.Object;
+
+	ConstructorHelpers::FObjectFinder<UInputAction> mapVerticalInputAction(
+	TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapVertical.IA_MapVertical'"));
+	if (mapVerticalInputAction.Succeeded()) IA_MapVertical = mapVerticalInputAction.Object;
 }
 
 // Called when the game starts or when spawned
@@ -75,7 +83,7 @@ void APlayerCharacter::BeginPlay()
 		CUSTOMLOG(TEXT("%s"), TEXT("Player Cannot find ball"));
 	}
 
-	// FieldWidget 포인터 가져오기
+	// FieldGameMode와 FieldWidget 포인터 가져오기
 	AGameModeBase* gmb = UGameplayStatics::GetGameMode(GetWorld());
 	if (gmb)
 	{
@@ -129,6 +137,15 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	{
 		Input->BindAction(IA_ShorterClub, ETriggerEvent::Started, this, &APlayerCharacter::OnShorterClubInput);
 	}
+	if (IA_MapHorizontal)
+	{
+		Input->BindAction(IA_MapHorizontal, ETriggerEvent::Triggered, this, &APlayerCharacter::OnMapHorizontalInput);
+	}
+	if (IA_MapVertical)
+	{
+		Input->BindAction(IA_MapVertical, ETriggerEvent::Triggered, this, &APlayerCharacter::OnMapVerticalInput);
+	}
+	
 }
 
 void APlayerCharacter::OnShotInput(const FInputActionValue& v)
@@ -136,6 +153,13 @@ void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("ShotInput"));
 
+	// 맵 보는 중 샷을 하려고 하면 맵에서 나간다
+	if (mapOpen)
+	{
+		CloseMap();
+		return;
+	}
+	
 	if (FieldWidget)
 	{
 		FieldWidget->PressShotBar();
@@ -146,6 +170,12 @@ void APlayerCharacter::OnMapInput(const FInputActionValue& v)
 {
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("MapInput"));
+
+	// 이미 타구바가 움직이는 중이면 리턴한다
+	if (FieldWidget && FieldWidget->GetShotBarActivated()) return;
+	
+	if (mapOpen) CloseMap();
+	else OpenMap();
 }
 
 void APlayerCharacter::OnTurnInput(const FInputActionValue& v)
@@ -178,6 +208,22 @@ void APlayerCharacter::OnShorterClubInput(const FInputActionValue& v)
 	UE_LOG(LogTemp, Display, TEXT("ShorterClub"));
 }
 
+void APlayerCharacter::OnMapHorizontalInput(const struct FInputActionValue& v)
+{
+	if (CurrentState != EPlayerState::SHOTPREP) return;
+	if (!mapOpen) return;
+
+	FieldGameModeBase->MoveMapCameraHorizontal(v.Get<float>());
+}
+
+void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
+{
+	if (CurrentState != EPlayerState::SHOTPREP) return;
+	if (!mapOpen) return;
+
+	FieldGameModeBase->MoveMapCameraVertical(v.Get<float>());
+}
+
 void APlayerCharacter::OnFieldFire(float power, float dir)
 {
 	if (!Ball->Launch(power, dir))
@@ -187,6 +233,28 @@ void APlayerCharacter::OnFieldFire(float power, float dir)
 	else
 	{
 		CurrentState = EPlayerState::FLYBALL; // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
-		FieldGameModeBase->SetCameraMode(ECameraMode::BALL);
+		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
 	}
+}
+
+bool APlayerCharacter::OpenMap()
+{
+	if (mapOpen) return false;
+
+	FieldGameModeBase->SetCameraMode(ECameraMode::MAP);
+
+	mapOpen = true;
+	
+	return true;
+}
+
+bool APlayerCharacter::CloseMap()
+{
+	if (!mapOpen) return false;
+
+	FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+
+	mapOpen = false;
+	
+	return true;
 }

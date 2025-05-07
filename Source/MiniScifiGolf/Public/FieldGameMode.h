@@ -40,13 +40,18 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	class ACameraActor* BallCamera;
 
 	UPROPERTY(EditAnywhere)
-	class ACameraActor* MapCamera;
-	
+	class AMapCamera* MapCamera;
+
+	bool CheckValidCamera(ECameraMode mode, AActor*& cameraActor);
 public:
 	bool SetCameraMode(ECameraMode mode);
-
+	bool SetCameraModeWithBlend(ECameraMode mode, float duration = 1.0f);
+	
 	UPROPERTY()
 	class UFieldWidget* FieldWidget;
+
+	void MoveMapCameraVertical(float v);
+	void MoveMapCameraHorizontal(float v);
 
 private:
 	UPROPERTY(EditAnywhere)
