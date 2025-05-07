@@ -27,7 +27,7 @@ AGolfBallBase::AGolfBallBase()
 		SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("Collider"));
 		RootComponent = SphereComp;
 		SphereComp->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		SphereComp->SetSimulatePhysics(true);
+		//SphereComp->SetSimulatePhysics(true);
 		SphereComp->SetNotifyRigidBodyCollision(true);
 		SphereComp->InitSphereRadius(GOLFBALLBASE_RADIUS);
 		SphereComp->SetUseCCD(true);
@@ -52,11 +52,11 @@ AGolfBallBase::AGolfBallBase()
 		ArrowComp->SetCollisionProfileName(TEXT("NoCollision"));
 	}
 
-	//if (!SpringArmComp)
-	//{
-	//	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	//	SpringArmComp->SetupAttachment(RootComponent);
-	//}
+	if (!SpringArmComp)
+	{
+		SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+		SpringArmComp->SetupAttachment(RootComponent);
+	}
 
 	//// CameraComp
 	//CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -125,59 +125,37 @@ void AGolfBallBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	// 마그누스 효과
-	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
-	                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
-	if (HasBallHitGround) MagnusForce.Z = 0.0f; // 땅에 구를때는 이거라도 없애줘야 그나마 자연스러워진다
-	SphereComp->AddForce(MagnusForce);
-
-	// 충돌의 연속 체크
-	if (BallHitGroundLastFrame)
+	if (PhysicsSimulated)
 	{
-		if (ConsecutiveCollision < FMath::Max(HitGroundDecelerationLimitFrame, ConsecutiveCollisionFramesForRoll))
+		// 마그누스 효과
+		FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
+			SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+		if (HasBallHitGround) MagnusForce.Z = 0.0f; // 땅에 구를때는 이거라도 없애줘야 그나마 자연스러워진다
+		SphereComp->AddForce(MagnusForce);
+
+		// 충돌의 연속 체크
+		if (BallHitGroundLastFrame)
 		{
-			ConsecutiveCollision++;
-			//UE_LOG(LogTemp, Warning, TEXT("ConsecutiveCollision: %d"), ConsecutiveCollision);
+			if (ConsecutiveCollision < FMath::Max(HitGroundDecelerationLimitFrame, ConsecutiveCollisionFramesForRoll))
+			{
+				ConsecutiveCollision++;
+				//UE_LOG(LogTemp, Warning, TEXT("ConsecutiveCollision: %d"), ConsecutiveCollision);
+			}
 		}
-	}
-	else
-	{
-		ConsecutiveCollision = 0;
-	}
-	BallHitGroundLastFrame = false;
-
-	// 공 멈춤 체크
-	if (IsRolling && !HasStopped && SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
-	{
-		HasStopped = true;
-		SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
-		SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
-		UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
-		UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
-	}
-
-	// 시뮬레이션용
-	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-	{
-		// 샷
-		if (!IsSimulated && PC->WasInputKeyJustPressed(EKeys::P))
+		else
 		{
-			Launch();
-			IsSimulated = true;
+			ConsecutiveCollision = 0;
 		}
+		BallHitGroundLastFrame = false;
 
-		// 리셋
-		if (PC->WasInputKeyJustPressed(EKeys::R))
+		// 공 멈춤 체크
+		if (IsRolling && !HasStopped && SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
 		{
-			ResetGolfBall();
-			UE_LOG(LogTemp, Warning, TEXT("Reset"));
-		}
+			HasStopped = true;
+			PhysicsSimulate(false);
 
-		// test
-		if (PC->WasInputKeyJustPressed(EKeys::T))
-		{
-			//ResetGolfBallRotation();
-			GetWorld()->GetDeltaSeconds();
+			UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
+			UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
 		}
 	}
 
@@ -185,6 +163,46 @@ void AGolfBallBase::Tick(float DeltaTime)
 	float size = SphereComp->GetPhysicsLinearVelocity().Size();
 	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0, true, 1);
 	//DrawDebugString(GetWorld(), GetActorLocation(), SphereComp->GetComponentVelocity().ToString(), nullptr, FColor::Magenta, 0, true, 2);
+}
+
+bool AGolfBallBase::PhysicsSimulate(bool v)
+{
+	if (v == PhysicsSimulated)
+	{
+		CUSTOMLOG(TEXT("PhysicsSimulate 상태가 이미 %b"), v);
+		return false;
+	}
+
+	SphereComp->SetSimulatePhysics(v);
+
+	if (v) // start simulate
+	{
+		if (SphereComp)
+		{
+			SphereComp->OnComponentHit.AddDynamic(this, &AGolfBallBase::OnCollision);
+		}
+
+		PhysicsSimulated = true;
+	}
+	else // end simulate
+	{
+		if (SphereComp)
+		{
+			SphereComp->OnComponentHit.RemoveDynamic(this, &AGolfBallBase::OnCollision);
+		}
+
+		SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
+		SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
+
+		PhysicsSimulated = false;
+	}
+
+	IsRolling = false;
+	HasStopped = false;
+	BallHitGroundLastFrame = false;
+	ConsecutiveCollision = 0;
+
+	return true;
 }
 
 float AGolfBallBase::TurnDirection(bool right)
@@ -203,8 +221,14 @@ float AGolfBallBase::TurnDirection(bool right)
 	return 0.0f;
 }
 
-void AGolfBallBase::Launch()
+// 공 치기!
+bool AGolfBallBase::Launch(float power, float dir)
 {
+	if (!PhysicsSimulate(true)) return false;
+
+	// 타구바에서 주어진 power과 dir을 기반으로 샷 계산
+	CurrentHeadDegree += dir * AccuracyRate;
+
 	FRotator Rot(0.f, CurrentHeadDegree, 0.f);
 	CurrentHeadVector = Rot.Vector();
 
@@ -218,19 +242,16 @@ void AGolfBallBase::Launch()
 
 	ImpulseAmount = LaunchVelocityDirection * LaunchFullForce;
 
-	FVector finalForce = ImpulseAmount * ForceScalar; // finalforce에 어떤 연산을 가해야 선형적이어진다
+	FVector finalForce = ImpulseAmount * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
 	SphereComp->AddImpulse(finalForce, TEXT("None"), false);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
 
-	if (SphereComp)
-	{
-		SphereComp->OnComponentHit.AddDynamic(this, &AGolfBallBase::OnCollision);
-	}
+	return true;
 }
 
 void AGolfBallBase::Visualize()
 {
-	if (IsSimulated && LastLocation != GetActorLocation())
+	if (PhysicsSimulated && LastLocation != GetActorLocation())
 	{
 		DrawDebugLine(GetWorld(), LastLocation, GetActorLocation(), FColor::Red, true);
 	}
@@ -244,7 +265,7 @@ void AGolfBallBase::ResetGolfBall()
 	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
 	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
 
-	IsSimulated = false;
+	PhysicsSimulated = false;
 	IsRolling = false;
 	HasStopped = false;
 	BallHitGroundLastFrame = false;
@@ -254,7 +275,7 @@ void AGolfBallBase::ResetGolfBall()
 void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor,
                                 UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if (!IsSimulated) return;
+	if (!PhysicsSimulated) return;
 
 	// 처음 땅에 닿았을 때
 	if (!HasBallHitGround)

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "FieldWidget.h"
 #include "PlayerCharacter.generated.h"
 
 UENUM(BlueprintType)
@@ -18,6 +19,8 @@ enum class EPlayerState : uint8
 	 // ³¡
 };
 
+class AFieldGameMode;
+
 UCLASS()
 class MINISCIFIGOLF_API APlayerCharacter : public ACharacter
 {
@@ -30,6 +33,11 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+private:
+	AFieldGameMode* FieldGameModeBase;
 
 public:	
 	// Called every frame
@@ -68,4 +76,10 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	class AGolfBallBase* Ball;
+
+	UPROPERTY(EditAnywhere)
+	class UFieldWidget* FieldWidget;
+
+	UFUNCTION()
+	void OnFieldFire(float power, float dir);
 };

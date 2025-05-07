@@ -9,6 +9,8 @@
 /**
  *
  */
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnShotSignature, float, power, float, dir);
+
 UCLASS()
 class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 {
@@ -27,17 +29,34 @@ class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 	UPROPERTY(EditAnywhere)
 	float ShotBarValue;
 
-	bool ShotBarActivated = true;
+	// 차례로 true가 된다
+	bool ShotBarActivated = false;
+	bool PowerSet = false;
+	bool DirectionSet = false;
+
 	bool ShotBarDirection = true; //true: up, false: down
 
-	float PowerValue = -1.0f;
-	float DirectionValue = -0.0f;
+	// 타구바에서 정해지는 값
+	
+	// 0.0f~1.0f (정상값), -1.0f (없음), 
+	float PowerValue = -1.0f; 
+
+	// -1.0f~1.0f (정상값), -1.0f (없음), < -5.0f (실패)
+	float DirectionValue = -1.0f;
 
 public:
 	UFieldWidget(const FObjectInitializer& ObjectInitializer);
 
 	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+	// 이벤트
+	UPROPERTY()
+	FOnShotSignature OnShotMade;
+
+	UFUNCTION()
+	void PressShotBar();
+
+	// 샷에 필요한 세 가지 인풋
 	UFUNCTION()
 	void ActivateShotBar();
 

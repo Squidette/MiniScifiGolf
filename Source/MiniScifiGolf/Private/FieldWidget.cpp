@@ -20,25 +20,53 @@ void UFieldWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 }
 
-void UFieldWidget::ActivateShotBar()
+void UFieldWidget::PressShotBar()
 {
 	if (!ShotBarActivated)
 	{
-		ShotBarActivated = true;
+		ActivateShotBar();
 	}
+	else if (!PowerSet)
+	{
+		SetPower();
+	}
+	else if (!DirectionSet)
+	{
+		SetDirection();
+	}
+}
+
+void UFieldWidget::ActivateShotBar()
+{
+	ShotBarActivated = true;
 }
 
 void UFieldWidget::SetPower()
 {
+	if (ShotBarValue > FIELDWIDGET_SPINBARRATIO)
+	{
+		PowerValue = ShotBarValue;
+		PowerSet = true;
+	}
 }
 
 void UFieldWidget::SetDirection()
 {
+	if (ShotBarValue > FIELDWIDGET_SPINBARRATIO)
+	{
+		DirectionValue = -10.0f;
+	}
+	else
+	{
+		DirectionValue = ShotBarValue - 0.1f;
+	}
+
+	DirectionSet = true;
 }
 
 void UFieldWidget::UpdateShotBar(const float& dt)
 {
-	if (ShotBarDirection) // up
+	if (ShotBarDirection) // 올라가기
 	{
 		ShotBarValue += ShotBarSpeed * dt;
 
@@ -48,14 +76,23 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 			ShotBarDirection = false;
 		}
 	}
-	else // down
+	else // 내려가기
 	{
 		ShotBarValue -= ShotBarSpeed * dt;
 
+		// 타구바 끝
 		if (ShotBarValue < 0.0f)
 		{
 			ShotBarValue = 0.0f;
+
+			ShotBarActivated = false;
+
+			UE_LOG(LogTemp, Warning, TEXT("타구바: %f, %f"), PowerValue, DirectionValue);
+			OnShotMade.Execute(PowerValue, DirectionValue);
+
 			ShotBarDirection = true;
+			PowerSet = false;
+			DirectionSet = false;
 		}
 	}
 

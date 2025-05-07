@@ -30,9 +30,6 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UUserWidget> FieldWidgetFactory;
 
-	UPROPERTY()
-	class UFieldWidget* FieldWidget;
-
 	// 카메라
 	ECameraMode CurrentCameraState = ECameraMode::NONE;
 
@@ -47,6 +44,9 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	
 public:
 	bool SetCameraMode(ECameraMode mode);
+
+	UPROPERTY()
+	class UFieldWidget* FieldWidget;
 
 private:
 	UPROPERTY(EditAnywhere)

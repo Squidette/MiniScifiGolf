@@ -7,6 +7,8 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GolfBallBase.h"
+#include "FieldGameMode.h"
+#include "Kismet/GameplayStatics.h"
 #include "InputMappingContext.h"
 
 // Sets default values
@@ -72,6 +74,26 @@ void APlayerCharacter::BeginPlay()
 	{
 		CUSTOMLOG(TEXT("%s"), TEXT("Player Cannot find ball"));
 	}
+
+	// FieldWidget 포인터 가져오기
+	AGameModeBase* gmb = UGameplayStatics::GetGameMode(GetWorld());
+	if (gmb)
+	{
+		FieldGameModeBase = Cast<AFieldGameMode>(gmb);
+
+		if (FieldGameModeBase)
+		{
+			FieldWidget = FieldGameModeBase->FieldWidget;
+
+			FieldWidget->OnShotMade.BindDynamic(this, &APlayerCharacter::OnFieldFire);
+		}
+	}
+}
+
+void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (FieldWidget) { FieldWidget->OnShotMade.Unbind(); }
+	Super::EndPlay(EndPlayReason);
 }
 
 // Called every frame
@@ -113,6 +135,11 @@ void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 {
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("ShotInput"));
+
+	if (FieldWidget)
+	{
+		FieldWidget->PressShotBar();
+	}
 }
 
 void APlayerCharacter::OnMapInput(const FInputActionValue& v)
@@ -149,4 +176,17 @@ void APlayerCharacter::OnShorterClubInput(const FInputActionValue& v)
 {
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	UE_LOG(LogTemp, Display, TEXT("ShorterClub"));
+}
+
+void APlayerCharacter::OnFieldFire(float power, float dir)
+{
+	if (!Ball->Launch(power, dir))
+	{
+		CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));
+	}
+	else
+	{
+		CurrentState = EPlayerState::FLYBALL; // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
+		FieldGameModeBase->SetCameraMode(ECameraMode::BALL);
+	}
 }

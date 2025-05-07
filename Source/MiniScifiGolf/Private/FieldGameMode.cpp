@@ -5,6 +5,7 @@
 #include "FieldWidget.h"
 #include "Camera/CameraActor.h"
 #include "PlayerCamera.h"
+#include "BallCamera.h"
 #include "EngineUtils.h"
 #include "../MiniScifiGolf.h"
 
@@ -29,6 +30,16 @@ void AFieldGameMode::BeginPlay()
 		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Camera.Player"))))
 		{
 			PlayerCamera = Cast<ACameraActor>(*It);
+			break;
+		}
+	}
+
+	// 태그로 공 카메라 찾기
+	for (TActorIterator<ABallCamera> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTagContainer().HasTag(FGameplayTag::RequestGameplayTag(FName("Camera.Ball"))))
+		{
+			BallCamera = Cast<ACameraActor>(*It);
 			break;
 		}
 	}

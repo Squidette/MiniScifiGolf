@@ -36,23 +36,26 @@ public:
 	class UStaticMeshComponent* StaticMeshComp;
 
 	UPROPERTY(EditAnywhere)
+	class USpringArmComponent* SpringArmComp;
+
+	UPROPERTY(EditAnywhere)
 	class UArrowComponent* ArrowComp;
 
-	//UPROPERTY(EditAnywhere)
-	//class USpringArmComponent* SpringArmComp;
-
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	//class UCameraComponent* CameraComp;
+	bool PhysicsSimulated = false;
+	bool PhysicsSimulate(bool v);
 
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
 	UPROPERTY(EditAnywhere) // 발사각, 0~90사이
 	float LaunchAngleDegree = 40.0f;
 
 	UPROPERTY(EditAnywhere)
-	float LaunchFullForce = 950.0f; // 100% 힘의 세기
+	float LaunchFullForce = 950.0f; // 100% 힘의 세기로, 채 종류에 의해 결정
 
-	UPROPERTY(EditAnywhere) // 0~1
-	float ForceScalar = 1.0f; // 100% 힘의 세기
+	UPROPERTY(EditAnywhere)
+	float AccuracyRate = 5.0f; // 샷의 정확도 (양수, 0에 가까울수록 정확해짐)
+
+	//UPROPERTY(EditAnywhere) // 0~1
+	//float ForceScalar = 1.0f; //
 
 	UPROPERTY(EditAnywhere)
 	float CurrentHeadDegree;
@@ -86,12 +89,11 @@ public:
 	UPROPERTY(EditAnywhere)
 	float AnglularDamping_Rolling = 0.05f;
 
-	// 공의 상태: IsSimulated, IsRolling, HasStopped가 차례대로 true가 되며 끝난다
-	bool IsSimulated = false;
+	// 공의 상태: PhysicsSimulated, IsRolling, HasStopped가 차례대로 true가 되며 끝난다
 
 	// 공 치기
 	UFUNCTION()
-	void Launch();
+	bool Launch(float power, float dir);
 
 	/// 샷 이후 공이 처음으로 땅에 닿았는지 여부
 	bool HasBallHitGround = false;
