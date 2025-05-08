@@ -68,7 +68,7 @@ void UFieldWidget::SetDirection()
 
 void UFieldWidget::UpdateShotBar(const float& dt)
 {
-	if (ShotBarDirection) // �ö󰡱�
+	if (ShotBarDirection) // 올라감
 	{
 		ShotBarValue += ShotBarSpeed * dt;
 
@@ -78,7 +78,7 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 			ShotBarDirection = false;
 		}
 	}
-	else // ��������
+	else // 내려감
 	{
 		ShotBarValue -= ShotBarSpeed * dt;
 
@@ -89,7 +89,7 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 
 			ShotBarActivated = false;
 
-			UE_LOG(LogTemp, Warning, TEXT("Ÿ����: %f, %f"), PowerValue, DirectionValue);
+			UE_LOG(LogTemp, Warning, TEXT("샷: %f, %f"), PowerValue, DirectionValue);
 			OnShotMade.Execute(PowerValue, DirectionValue);
 
 			ShotBarDirection = true;

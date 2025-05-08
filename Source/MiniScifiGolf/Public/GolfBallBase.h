@@ -63,7 +63,7 @@ public:
 	float CurrentHeadDegree;
 
 	UPROPERTY(EditAnywhere)
-	float HeadDegreeTurnSpeed = 10.0f;
+	float HeadDegreeTurnSpeed = 30.0f;
 
 	float TurnDirection(bool right);
 

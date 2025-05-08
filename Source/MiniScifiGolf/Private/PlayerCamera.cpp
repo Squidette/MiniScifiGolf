@@ -14,3 +14,8 @@ APlayerCamera::APlayerCamera(const FObjectInitializer& ObjectInitializer)
 		TagContainer.AddTag(playerCameraTag);
 	}
 }
+
+void APlayerCamera::SetLocation(const FVector& NewLocation)
+{
+	SetActorLocation(NewLocation);
+}

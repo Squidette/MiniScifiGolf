@@ -90,6 +90,17 @@ public:
 	UPROPERTY(EditAnywhere)
 	class AGolfBallBase* Ball;
 
+	UFUNCTION()
+	void OnBallStopped();
+
+	// 플레이어가 공으로부터 얼마나 떨어져있을 것인지
+	UPROPERTY(EditAnywhere)
+	FVector PlayerOffsetFromBall = FVector(0.0f, -70.0f, 100.0f);
+
+	// 플레이어 카메라가 공으로부터 얼마나 떨어져있을 것인지
+	UPROPERTY(EditAnywhere)
+	FVector PlayerCameraOffsetFromBall = FVector(-400.0f, 0.0f, 110.0f);
+
 	UPROPERTY(EditAnywhere)
 	class UFieldWidget* FieldWidget;
 

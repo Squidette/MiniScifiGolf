@@ -23,4 +23,6 @@ public:
 	APlayerCamera(const FObjectInitializer& ObjectInitializer);
 
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
+
+	void SetLocation(const FVector& NewLocation);
 };

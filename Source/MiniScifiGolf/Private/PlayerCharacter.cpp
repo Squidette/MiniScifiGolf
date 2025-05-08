@@ -9,7 +9,10 @@
 #include "GolfBallBase.h"
 #include "FieldGameMode.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/SphereComponent.h"
 #include "InputMappingContext.h"
+#include "MovieSceneTracksComponentTypes.h"
+#include "Camera/CameraActor.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
@@ -56,6 +59,8 @@ APlayerCharacter::APlayerCharacter()
 	ConstructorHelpers::FObjectFinder<UInputAction> mapVerticalInputAction(
 	TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapVertical.IA_MapVertical'"));
 	if (mapVerticalInputAction.Succeeded()) IA_MapVertical = mapVerticalInputAction.Object;
+
+	bUseControllerRotationYaw = false;
 }
 
 // Called when the game starts or when spawned
@@ -67,6 +72,20 @@ void APlayerCharacter::BeginPlay()
 		GetWorld()->GetFirstPlayerController()->GetLocalPlayer());
 	
 	if (subsys) { subsys->AddMappingContext(IMC_GolfControl, 0); }
+
+	// FieldGameMode와 FieldWidget 포인터 가져오기
+	AGameModeBase* gmb = UGameplayStatics::GetGameMode(GetWorld());
+	if (gmb)
+	{
+		FieldGameModeBase = Cast<AFieldGameMode>(gmb);
+
+		if (FieldGameModeBase)
+		{
+			FieldWidget = FieldGameModeBase->FieldWidget;
+
+			FieldWidget->OnShotMade.BindDynamic(this, &APlayerCharacter::OnFieldFire);
+		}
+	}
 
 	// 태그로 공 찾기
 	for (TActorIterator<AGolfBallBase> It(GetWorld()); It; ++It)
@@ -82,19 +101,18 @@ void APlayerCharacter::BeginPlay()
 	{
 		CUSTOMLOG(TEXT("%s"), TEXT("Player Cannot find ball"));
 	}
-
-	// FieldGameMode와 FieldWidget 포인터 가져오기
-	AGameModeBase* gmb = UGameplayStatics::GetGameMode(GetWorld());
-	if (gmb)
+	else
 	{
-		FieldGameModeBase = Cast<AFieldGameMode>(gmb);
+		Ball->OnBallStopped.BindDynamic(this, &APlayerCharacter::OnBallStopped);
 
-		if (FieldGameModeBase)
-		{
-			FieldWidget = FieldGameModeBase->FieldWidget;
+		// 플레이어를 공에 붙인다
+		USceneComponent* BallRootComp = Cast<USceneComponent>(Ball->GetRootComponent());
+		GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
+		GetRootComponent()->SetRelativeLocation(PlayerOffsetFromBall);
 
-			FieldWidget->OnShotMade.BindDynamic(this, &APlayerCharacter::OnFieldFire);
-		}
+		// 카메라도 붙인다
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
 	}
 }
 
@@ -224,8 +242,23 @@ void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
 	FieldGameModeBase->MoveMapCameraVertical(v.Get<float>());
 }
 
+// 공이 멈췄을 때
+void APlayerCharacter::OnBallStopped()
+{
+	// 플레이어가 공 쪽으로 간다
+	SetActorLocation(Ball->GetActorLocation() + PlayerOffsetFromBall);
+
+	// 카메라 변경
+	FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+}
+
+// 위젯에서 샷이 확정되었을 때 정보가 보내짐
 void APlayerCharacter::OnFieldFire(float power, float dir)
 {
+	// 공에서 캐릭터와 카메라를 뗀다
+	GetRootComponent()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	
 	if (!Ball->Launch(power, dir))
 	{
 		CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));

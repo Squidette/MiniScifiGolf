@@ -152,7 +152,7 @@ void AGolfBallBase::Tick(float DeltaTime)
 		if (IsRolling && !HasStopped && SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
 		{
 			HasStopped = true;
-			//OnBallStopped.ExecuteIfBound();
+			OnBallStopped.ExecuteIfBound();
 			PhysicsSimulate(false);
 
 			UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());

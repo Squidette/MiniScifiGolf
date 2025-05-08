@@ -7,7 +7,7 @@
 #include "FieldWidget.generated.h"
 
 /**
- *
+ * 타구바
  */
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnShotSignature, float, power, float, dir);
 
@@ -33,12 +33,12 @@ class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 
 	bool ShotBarDirection = true; //true: up, false: down
 
-	// Ÿ���ٿ��� �������� ��
+	// 타구바에서 정해지는 값 2개
 	
-	// 0.0f~1.0f (����), -1.0f (����), 
+	// 0.0f~1.0f (정상), -1.0f (없음), 
 	float PowerValue = -1.0f; 
 
-	// -1.0f~1.0f (����), -1.0f (����), < -5.0f (����)
+	// -1.0f~1.0f (정상), -1.0f (없음), < -5.0f (FAIL)
 	float DirectionValue = -1.0f;
 
 public:

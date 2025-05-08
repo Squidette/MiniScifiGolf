@@ -2,6 +2,7 @@
 <project version="4">
   <component name="Encoding" addBOMForNewFiles="with BOM under Windows, with no BOM otherwise">
     <file url="file://$PROJECT_DIR$/Source/MiniScifiGolf/Private/BallCamera.cpp" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Source/MiniScifiGolf/Private/FieldWidget.cpp" charset="EUC-KR" />
     <file url="file://$PROJECT_DIR$/Source/MiniScifiGolf/Private/PlayerCamera.cpp" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Source/MiniScifiGolf/Public/FieldWidget.h" charset="EUC-KR" />
     <file url="file://$PROJECT_DIR$/Source/MiniScifiGolf/Public/MapCamera.h" charset="UTF-8" />

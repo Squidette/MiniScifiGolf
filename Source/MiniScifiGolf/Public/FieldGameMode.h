@@ -25,7 +25,7 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	GENERATED_BODY()
 
 	virtual void BeginPlay() override;
-	
+
 	// UI
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UUserWidget> FieldWidgetFactory;
@@ -43,15 +43,18 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	class AMapCamera* MapCamera;
 
 	bool CheckValidCamera(ECameraMode mode, AActor*& cameraActor);
+
 public:
 	bool SetCameraMode(ECameraMode mode);
 	bool SetCameraModeWithBlend(ECameraMode mode, float duration = 1.0f);
-	
+
 	UPROPERTY()
 	class UFieldWidget* FieldWidget;
 
 	void MoveMapCameraVertical(float v);
 	void MoveMapCameraHorizontal(float v);
+
+	const ACameraActor* GetPlayerCamera() const { return PlayerCamera; }
 
 private:
 	UPROPERTY(EditAnywhere)
