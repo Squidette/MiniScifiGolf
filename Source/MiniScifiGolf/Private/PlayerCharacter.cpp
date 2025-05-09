@@ -12,6 +12,7 @@
 #include "Components/SphereComponent.h"
 #include "InputMappingContext.h"
 #include "MovieSceneTracksComponentTypes.h"
+#include "PlayerAnim.h"
 #include "Camera/CameraActor.h"
 
 // Sets default values
@@ -22,10 +23,18 @@ APlayerCharacter::APlayerCharacter()
 
 	// 메쉬 지정
 	ConstructorHelpers::FObjectFinder<USkeletalMesh> skeletalMesh(
-		TEXT("/Script/Engine.SkeletalMesh'/Game/Resources/Cloudia/Model/Cloudia_Mesh.Cloudia_Mesh'"));
+		TEXT("/Script/Engine.SkeletalMesh'/Game/Resources/Cloudia/Model/Root_Cloudia.Root_Cloudia'"));
 	if (skeletalMesh.Succeeded())
 	{
 		GetMesh()->SetSkeletalMesh(skeletalMesh.Object);
+	}
+
+	// 애니메이션 블루프린트 지정
+	ConstructorHelpers::FObjectFinder<UAnimBlueprint> animBlueprint(
+		TEXT("/Script/Engine.AnimBlueprint'/Game/Blueprints/ABP_PlayerRootAnim.ABP_PlayerRootAnim'"));
+	if (animBlueprint.Succeeded())
+	{
+		GetMesh()->SetAnimInstanceClass(animBlueprint.Object->GeneratedClass);
 	}
 
 	ConstructorHelpers::FObjectFinder<UInputMappingContext> imc(
@@ -53,11 +62,11 @@ APlayerCharacter::APlayerCharacter()
 	if (shorterClubInputAction.Succeeded()) IA_ShorterClub = shorterClubInputAction.Object;
 
 	ConstructorHelpers::FObjectFinder<UInputAction> mapHorizontalInputAction(
-	TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapHorizontal.IA_MapHorizontal'"));
+		TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapHorizontal.IA_MapHorizontal'"));
 	if (mapHorizontalInputAction.Succeeded()) IA_MapHorizontal = mapHorizontalInputAction.Object;
 
 	ConstructorHelpers::FObjectFinder<UInputAction> mapVerticalInputAction(
-	TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapVertical.IA_MapVertical'"));
+		TEXT("/Script/EnhancedInput.InputAction'/Game/Inputs/IA_MapVertical.IA_MapVertical'"));
 	if (mapVerticalInputAction.Succeeded()) IA_MapVertical = mapVerticalInputAction.Object;
 
 	bUseControllerRotationYaw = false;
@@ -67,10 +76,10 @@ APlayerCharacter::APlayerCharacter()
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	auto* subsys = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
 		GetWorld()->GetFirstPlayerController()->GetLocalPlayer());
-	
+
 	if (subsys) { subsys->AddMappingContext(IMC_GolfControl, 0); }
 
 	// FieldGameMode와 FieldWidget 포인터 가져오기
@@ -111,9 +120,21 @@ void APlayerCharacter::BeginPlay()
 		GetRootComponent()->SetRelativeLocation(PlayerOffsetFromBall);
 
 		// 카메라도 붙인다
-		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
-		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
+		if (FieldGameModeBase)
+		{
+			FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(
+				BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
+			FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
+		}
 	}
+
+	// 애니메이션 블루프린트 저장
+	if (UAnimInstance* animInst = GetMesh()->GetAnimInstance())
+	{
+		Anim = Cast<UPlayerAnim>(animInst);
+	}
+
+	SetCurrentState(EPlayerState::SHOTPREP);
 }
 
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -145,7 +166,9 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 	if (IA_Turn)
 	{
+		Input->BindAction(IA_Turn, ETriggerEvent::Started, this, &APlayerCharacter::OnTurnInputStart);
 		Input->BindAction(IA_Turn, ETriggerEvent::Triggered, this, &APlayerCharacter::OnTurnInput);
+		Input->BindAction(IA_Turn, ETriggerEvent::Completed, this, &APlayerCharacter::OnTurnInputEnd);
 	}
 	if (IA_LongerClub)
 	{
@@ -163,7 +186,6 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	{
 		Input->BindAction(IA_MapVertical, ETriggerEvent::Triggered, this, &APlayerCharacter::OnMapVerticalInput);
 	}
-	
 }
 
 void APlayerCharacter::OnShotInput(const FInputActionValue& v)
@@ -177,7 +199,7 @@ void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 		CloseMap();
 		return;
 	}
-	
+
 	if (FieldWidget)
 	{
 		FieldWidget->PressShotBar();
@@ -191,7 +213,7 @@ void APlayerCharacter::OnMapInput(const FInputActionValue& v)
 
 	// 이미 타구바가 움직이는 중이면 리턴한다
 	if (FieldWidget && FieldWidget->GetShotBarActivated()) return;
-	
+
 	if (mapOpen) CloseMap();
 	else OpenMap();
 }
@@ -214,6 +236,16 @@ void APlayerCharacter::OnTurnInput(const FInputActionValue& v)
 	}
 }
 
+void APlayerCharacter::OnTurnInputStart(const struct FInputActionValue& v)
+{
+	if (Anim) { Anim->SetPlayerTurning(true); }
+}
+
+void APlayerCharacter::OnTurnInputEnd(const struct FInputActionValue& v)
+{
+	if (Anim) { Anim->SetPlayerTurning(false); }
+}
+
 void APlayerCharacter::OnLongerClubInput(const FInputActionValue& v)
 {
 	if (CurrentState != EPlayerState::SHOTPREP) return;
@@ -231,7 +263,10 @@ void APlayerCharacter::OnMapHorizontalInput(const struct FInputActionValue& v)
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	if (!mapOpen) return;
 
-	FieldGameModeBase->MoveMapCameraHorizontal(v.Get<float>());
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->MoveMapCameraHorizontal(v.Get<float>());
+	}
 }
 
 void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
@@ -239,7 +274,10 @@ void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
 	if (CurrentState != EPlayerState::SHOTPREP) return;
 	if (!mapOpen) return;
 
-	FieldGameModeBase->MoveMapCameraVertical(v.Get<float>());
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->MoveMapCameraVertical(v.Get<float>());
+	}
 }
 
 // 공이 멈췄을 때
@@ -249,7 +287,10 @@ void APlayerCharacter::OnBallStopped()
 	SetActorLocation(Ball->GetActorLocation() + PlayerOffsetFromBall);
 
 	// 카메라 변경
-	FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+	}
 }
 
 // 위젯에서 샷이 확정되었을 때 정보가 보내짐
@@ -257,16 +298,25 @@ void APlayerCharacter::OnFieldFire(float power, float dir)
 {
 	// 공에서 캐릭터와 카메라를 뗀다
 	GetRootComponent()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-	FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-	
+
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->DetachFromComponent(
+			FDetachmentTransformRules::KeepWorldTransform);
+	}
+
 	if (!Ball->Launch(power, dir))
 	{
 		CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));
 	}
 	else
 	{
-		CurrentState = EPlayerState::FLYBALL; // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
-		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+		SetCurrentState(EPlayerState::FLYBALL); // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
+
+		if (FieldGameModeBase)
+		{
+			FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+		}
 	}
 }
 
@@ -274,10 +324,13 @@ bool APlayerCharacter::OpenMap()
 {
 	if (mapOpen) return false;
 
-	FieldGameModeBase->SetCameraMode(ECameraMode::MAP);
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->SetCameraMode(ECameraMode::MAP);
+	}
 
 	mapOpen = true;
-	
+
 	return true;
 }
 
@@ -285,9 +338,23 @@ bool APlayerCharacter::CloseMap()
 {
 	if (!mapOpen) return false;
 
-	FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::PLAYER);
+	}
 
 	mapOpen = false;
-	
+
 	return true;
+}
+
+void APlayerCharacter::SetCurrentState(EPlayerState newState)
+{
+	if (CurrentState != newState) return;
+
+	CurrentState = newState;
+	if (Anim)
+	{
+		Anim->SetPlayerState(CurrentState);
+	}
 }

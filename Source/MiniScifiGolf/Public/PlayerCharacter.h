@@ -78,15 +78,23 @@ public:
 	
 	void OnShotInput(const struct FInputActionValue& v);
 	void OnMapInput(const struct FInputActionValue& v);
+	void OnTurnInputStart(const struct FInputActionValue& v);
 	void OnTurnInput(const struct FInputActionValue& v);
+	void OnTurnInputEnd(const struct FInputActionValue& v);
 	void OnLongerClubInput(const struct FInputActionValue& v);
 	void OnShorterClubInput(const struct FInputActionValue& v);
 	void OnMapHorizontalInput(const struct FInputActionValue& v);
 	void OnMapVerticalInput(const struct FInputActionValue& v);
 
 	UPROPERTY(EditAnywhere)
-	EPlayerState CurrentState = EPlayerState::SHOTPREP;
+	EPlayerState CurrentState = EPlayerState::PRESHOTMOTION;
 
+	void SetCurrentState(EPlayerState newState);
+
+	// 애니메이션 블루프린트
+	UPROPERTY()
+	class UPlayerAnim* Anim;
+	
 	UPROPERTY(EditAnywhere)
 	class AGolfBallBase* Ball;
 
