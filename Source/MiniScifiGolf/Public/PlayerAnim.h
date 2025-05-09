@@ -10,6 +10,16 @@
 /**
  * 
  */
+DECLARE_DYNAMIC_DELEGATE(FOnEnterAnimEnd);
+
+UENUM(BlueprintType)
+enum class EShotAnims : uint8
+{
+	DRIVE,
+	CHIP,
+	PUTT
+};
+
 UCLASS()
 class MINISCIFIGOLF_API UPlayerAnim : public UAnimInstance
 {
@@ -20,9 +30,17 @@ protected:
 	EPlayerState PlayerState;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool PlayerTurning;
+	EShotAnims ShotAmim = EShotAnims::DRIVE;
+
+	// NOTIFIES
+	UFUNCTION()
+	void AnimNotify_EndEnter();
 
 public:
 	void SetPlayerState(EPlayerState playerState);
-	void SetPlayerTurning(bool b);
+
+	void SetShotAnim(EShotAnims shotAmim);
+
+	UPROPERTY()
+	FOnEnterAnimEnd OnEnterAnimEnd;
 };

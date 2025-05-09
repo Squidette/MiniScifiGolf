@@ -95,9 +95,14 @@ public:
 	UPROPERTY()
 	class UPlayerAnim* Anim;
 	
+	UFUNCTION()
+	void OnAnimEnterEnd();
+
+	// 공에 대한 포인터
 	UPROPERTY(EditAnywhere)
 	class AGolfBallBase* Ball;
 
+	// 등장 애니메이션이 끝나면 ABP에서 호출된다
 	UFUNCTION()
 	void OnBallStopped();
 

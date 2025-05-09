@@ -132,6 +132,11 @@ void APlayerCharacter::BeginPlay()
 	if (UAnimInstance* animInst = GetMesh()->GetAnimInstance())
 	{
 		Anim = Cast<UPlayerAnim>(animInst);
+
+		if (Anim)
+		{
+			Anim->OnEnterAnimEnd.BindDynamic(this, &APlayerCharacter::OnAnimEnterEnd);
+		}
 	}
 
 	SetCurrentState(EPlayerState::SHOTPREP);
@@ -238,12 +243,10 @@ void APlayerCharacter::OnTurnInput(const FInputActionValue& v)
 
 void APlayerCharacter::OnTurnInputStart(const struct FInputActionValue& v)
 {
-	if (Anim) { Anim->SetPlayerTurning(true); }
 }
 
 void APlayerCharacter::OnTurnInputEnd(const struct FInputActionValue& v)
 {
-	if (Anim) { Anim->SetPlayerTurning(false); }
 }
 
 void APlayerCharacter::OnLongerClubInput(const FInputActionValue& v)
@@ -357,4 +360,9 @@ void APlayerCharacter::SetCurrentState(EPlayerState newState)
 	{
 		Anim->SetPlayerState(CurrentState);
 	}
+}
+
+void APlayerCharacter::OnAnimEnterEnd()
+{
+	SetCurrentState(EPlayerState::SHOTPREP);
 }

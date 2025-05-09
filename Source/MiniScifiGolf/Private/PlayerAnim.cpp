@@ -3,14 +3,17 @@
 
 #include "PlayerAnim.h"
 
+void UPlayerAnim::AnimNotify_EndEnter()
+{
+	OnEnterAnimEnd.ExecuteIfBound();
+}
+
 void UPlayerAnim::SetPlayerState(EPlayerState playerState)
 {
 	PlayerState = playerState;
-
-	
 }
 
-void UPlayerAnim::SetPlayerTurning(bool b)
+void UPlayerAnim::SetShotAnim(EShotAnims shotAmim)
 {
-	PlayerTurning = b;
+	ShotAmim = shotAmim;
 }
