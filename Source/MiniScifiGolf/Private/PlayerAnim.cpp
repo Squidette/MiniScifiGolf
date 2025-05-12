@@ -8,6 +8,11 @@ void UPlayerAnim::AnimNotify_EndEnter()
 	OnEnterAnimEnd.ExecuteIfBound();
 }
 
+void UPlayerAnim::AnimNotify_EndShot()
+{
+	OnShotAnimEnd.ExecuteIfBound();
+}
+
 void UPlayerAnim::SetPlayerState(EPlayerState playerState)
 {
 	PlayerState = playerState;

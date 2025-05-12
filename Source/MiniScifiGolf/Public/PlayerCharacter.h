@@ -13,6 +13,7 @@ enum class EPlayerState : uint8
 {
 	PRESHOTMOTION,
 	SHOTPREP,
+	SHOTBARRUN,
 	SHOT,
 	FLYBALL,
 	POSTSHOTMOTION,
@@ -87,25 +88,37 @@ public:
 	void OnMapVerticalInput(const struct FInputActionValue& v);
 
 	UPROPERTY(EditAnywhere)
-	EPlayerState CurrentState = EPlayerState::PRESHOTMOTION;
+	EPlayerState CurrentState = EPlayerState::POSTSHOTMOTION;
 
 	void SetCurrentState(EPlayerState newState);
 
 	// 애니메이션 블루프린트
 	UPROPERTY()
 	class UPlayerAnim* Anim;
-	
+
+	// 등장 애니메이션이 끝나면 ABP에서 호출된다
 	UFUNCTION()
-	void OnAnimEnterEnd();
+	void OnEnterAnimationEnd();
+
+	// 샷 애니메이션이 끝나면 ABP에서 호출된다
+	UFUNCTION()
+	void OnShotAnimationEnd();
 
 	// 공에 대한 포인터
 	UPROPERTY(EditAnywhere)
 	class AGolfBallBase* Ball;
 
-	// 등장 애니메이션이 끝나면 ABP에서 호출된다
 	UFUNCTION()
 	void OnBallStopped();
+	
+	// 플레이어와 카메라가 공의 트랜스폼에 붙어 있는지 여부
+	bool IsPlayerAndCameraAttachedToBall = false;
+	void AttachPlayerAndCameraToBall();
+	void DettachPlayerAndCameraFromBall();
 
+	// 홀컵의 위치를 고려하여 플레이어와 카메라 포지션 리셋
+	void PlacePlayerAndCameraAroundBall();
+	
 	// 플레이어가 공으로부터 얼마나 떨어져있을 것인지
 	UPROPERTY(EditAnywhere)
 	FVector PlayerOffsetFromBall = FVector(0.0f, -70.0f, 100.0f);
@@ -117,6 +130,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	class UFieldWidget* FieldWidget;
 
+	// 타구바에서 샷이 결정되면 인보크됨
 	UFUNCTION()
-	void OnFieldFire(float power, float dir);
+	void OnShotMade(bool success, float power, float dir);
 };

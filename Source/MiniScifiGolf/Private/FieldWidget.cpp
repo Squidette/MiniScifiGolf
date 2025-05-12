@@ -3,7 +3,9 @@
 
 #include "FieldWidget.h"
 #include "Components/ProgressBar.h"
+#include "../MiniScifiGolf.h"
 
+// 타구바 중에서 왼쪽의 정확도 부분이 될 비율
 #define FIELDWIDGET_SPINBARRATIO 0.2f
 
 UFieldWidget::UFieldWidget(const FObjectInitializer& ObjectInitializer)
@@ -15,32 +17,48 @@ UFieldWidget::UFieldWidget(const FObjectInitializer& ObjectInitializer)
 void UFieldWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	
-	if (ShotBarActivated)
+
+	if (CurrentState != EShotBarState::INACTIVE)
 	{
 		UpdateShotBar(InDeltaTime);
 	}
 }
 
-void UFieldWidget::PressShotBar()
+bool UFieldWidget::PressShotBar()
 {
-	if (!ShotBarActivated)
+	switch (CurrentState)
 	{
-		ActivateShotBar();
-	}
-	else if (!PowerSet)
-	{
+	case EShotBarState::INACTIVE:
+		CUSTOMLOG(TEXT("%s"), TEXT("타구바 활성화됨"));
+		ResetShotBarPrivateProperties();
+		CurrentState = EShotBarState::WAITINGFORPOWERINPUT;
+		return true;
+	case EShotBarState::WAITINGFORPOWERINPUT:
 		SetPower();
-	}
-	else if (!DirectionSet)
-	{
-		SetDirection();
+		CurrentState = EShotBarState::WAITINGFORPRECISIONINPUT;
+		return false;
+	case EShotBarState::WAITINGFORPRECISIONINPUT:
+		SetPrecision();
+		CurrentState = EShotBarState::WAITINGFOREND;
+		return false;
+	default:
+		CUSTOMLOG(TEXT("%s"), TEXT("타구바는 더이상의 인풋을 받지않는다"));
+		return false;
 	}
 }
 
-void UFieldWidget::ActivateShotBar()
+void UFieldWidget::SetShotFail(bool b)
 {
-	ShotBarActivated = true;
+	ShotFail = b;
+}
+
+void UFieldWidget::ResetShotBarPrivateProperties()
+{
+	PowerValue = -1.0f;
+	PrecisionValue = -1.0f;
+	ShotFail = false;
+	ShotBarDirection = true;
+	ShotBarValue = FIELDWIDGET_SPINBARRATIO;
 }
 
 void UFieldWidget::SetPower()
@@ -48,27 +66,36 @@ void UFieldWidget::SetPower()
 	if (ShotBarValue > FIELDWIDGET_SPINBARRATIO)
 	{
 		PowerValue = ShotBarValue;
-		PowerSet = true;
-	}
-}
-
-void UFieldWidget::SetDirection()
-{
-	if (ShotBarValue > FIELDWIDGET_SPINBARRATIO)
-	{
-		DirectionValue = -10.0f;
 	}
 	else
 	{
-		DirectionValue = ShotBarValue - 0.1f;
+		SetShotFail(true);
 	}
+}
 
-	DirectionSet = true;
+void UFieldWidget::SetPrecision()
+{
+	if (ShotBarValue < FIELDWIDGET_SPINBARRATIO)
+	{
+		//PrecisionValue = ShotBarValue - 0.1f;
+
+		// [0 ~ (타구바비율)] 사이의 값을 [-1.0f ~ 1.0f] 사이의 값으로 매핑
+		PrecisionValue = FMath::GetMappedRangeValueClamped(
+			FVector2D(0.0f, FIELDWIDGET_SPINBARRATIO),
+			FVector2D(-1.0f, 1.0f),
+			ShotBarValue
+			);
+	}
+	else
+	{
+		SetShotFail(true);
+	}
 }
 
 void UFieldWidget::UpdateShotBar(const float& dt)
 {
-	if (ShotBarDirection) // 올라감
+	// 타구바가 올라감
+	if (ShotBarDirection)
 	{
 		ShotBarValue += ShotBarSpeed * dt;
 
@@ -78,23 +105,23 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 			ShotBarDirection = false;
 		}
 	}
-	else // 내려감
+	// 타구바가 내려감
+	else
 	{
 		ShotBarValue -= ShotBarSpeed * dt;
 
-		// 샷이 끝나면 샷 정보를 발송
+		// 밸류가 0으로 되돌아오면 샷을 끝냄
 		if (ShotBarValue < 0.0f)
 		{
 			ShotBarValue = 0.0f;
 
-			ShotBarActivated = false;
+			CurrentState = EShotBarState::INACTIVE;
 
-			UE_LOG(LogTemp, Warning, TEXT("샷: %f, %f"), PowerValue, DirectionValue);
-			OnShotMade.Execute(PowerValue, DirectionValue);
-
-			ShotBarDirection = true;
-			PowerSet = false;
-			DirectionSet = false;
+			if (ShotFail) { CUSTOMLOG(TEXT("샷 실패")); }
+			else { CUSTOMLOG(TEXT("타구바 비활성화됨, %f의 힘,  %f의 정확도"), PowerValue, PrecisionValue); }
+			
+			// 샷에서 정해진 정보를 발송
+			OnShotBarEnded.Execute(!ShotFail, PowerValue, PrecisionValue);
 		}
 	}
 
@@ -102,4 +129,9 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 	{
 		ShotBar->SetPercent(ShotBarValue);
 	}
+}
+
+EShotBarState UFieldWidget::GetState()
+{
+	return CurrentState;
 }

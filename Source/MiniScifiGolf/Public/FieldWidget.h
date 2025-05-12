@@ -9,61 +9,73 @@
 /**
  * 타구바
  */
-DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnShotSignature, float, power, float, dir);
+UENUM(BlueprintType)
+enum class EShotBarState : uint8
+{
+	INACTIVE,
+	WAITINGFORPOWERINPUT,
+	WAITINGFORPRECISIONINPUT,
+	WAITINGFOREND
+	 // 끝
+};
+
+//DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnShotSignature, float, power, float, dir);
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FOnShotBarEnded, bool, success, float, power, float, precision);
 
 UCLASS()
 class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
 {
 	GENERATED_BODY()
 	
-	// Ÿ����
 	UPROPERTY(meta = (BindWidget))
 	class UProgressBar* ShotBar;
 
 	UPROPERTY(EditAnywhere)
 	float ShotBarSpeed = 0.5f;
 
-	UPROPERTY(EditAnywhere)
+	//UPROPERTY(EditAnywhere)
 	float ShotBarValue;
 
-	// ���ʷ� true�� �ȴ�
-	bool ShotBarActivated = false;
-	bool PowerSet = false;
-	bool DirectionSet = false;
+	// 타구바의 상태 변수
+	EShotBarState CurrentState;
 
 	bool ShotBarDirection = true; //true: up, false: down
 
-	// 타구바에서 정해지는 값 2개
+	/// 타구바에서 정해지는 값 3개
 	
-	// 0.0f~1.0f (정상), -1.0f (없음), 
+	// 0.0f~1.0f (정상)
 	float PowerValue = -1.0f; 
 
-	// -1.0f~1.0f (정상), -1.0f (없음), < -5.0f (FAIL)
-	float DirectionValue = -1.0f;
+	// -0.1f~0.1f (정상)
+	float PrecisionValue = -1.0f;
+
+	// 샷의 실패 여부 기록
+	bool ShotFail = false;
+	void SetShotFail(bool b);
+
+	void ResetShotBarPrivateProperties();
 
 public:
 	UFieldWidget(const FObjectInitializer& ObjectInitializer);
 
 	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
-
-	// �̺�Ʈ
+	
 	UPROPERTY()
-	FOnShotSignature OnShotMade;
+	FOnShotBarEnded OnShotBarEnded;
 
+	// 리턴값 bool은 샷이 시작했는지를 리턴
 	UFUNCTION()
-	void PressShotBar();
-
-	// ���� �ʿ��� �� ���� ��ǲ
-	UFUNCTION()
-	void ActivateShotBar();
+	bool PressShotBar();
 
 	UFUNCTION()
 	void SetPower();
 
 	UFUNCTION()
-	void SetDirection();
+	void SetPrecision();
 
 	void UpdateShotBar(const float& dt);
-
-	inline bool GetShotBarActivated() const { return ShotBarActivated; }
+	
+	EShotBarState GetState();
+	
+	bool GetShotFail() const { return ShotFail; }
 };

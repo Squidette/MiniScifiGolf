@@ -17,19 +17,21 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	UPROPERTY()
 	FGameplayTagContainer TagContainer;
 
-public:
-	// Sets default values for this actor's properties
-	AGolfBallBase();
+	// 현재 공의 앞방향
+	float CurrentHeadDegree;
+	void SetCurrentHeadDegree(float newValue);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
+	
 public:
+	// Sets default values for this actor's properties
+	AGolfBallBase();
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
-public:
+	
 	// 기본 컴포넌트
 	UPROPERTY(EditAnywhere)
 	class USphereComponent* SphereComp;
@@ -47,30 +49,25 @@ public:
 	bool PhysicsSimulate(bool v);
 
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
-	UPROPERTY(EditAnywhere) // 발사각, 0~90사이
+	UPROPERTY(EditAnywhere) // 공이 땅과 이루는 발사각, 0~90사이
 	float LaunchAngleDegree = 40.0f;
 
 	UPROPERTY(EditAnywhere)
 	float LaunchFullForce = 950.0f; // 100% 힘의 세기로, 채 종류에 의해 결정
 
 	UPROPERTY(EditAnywhere)
-	float AccuracyRate = 5.0f; // 샷의 정확도 (양수, 0에 가까울수록 정확해짐)
-
-	//UPROPERTY(EditAnywhere) // 0~1
-	//float ForceScalar = 1.0f; //
-
-	UPROPERTY(EditAnywhere)
-	float CurrentHeadDegree;
+	float PrecisionRate = 5.0f; // 샷의 정확도 (양수, 0에 가까워질수록 정확해짐)
 
 	UPROPERTY(EditAnywhere)
 	float HeadDegreeTurnSpeed = 30.0f;
 
-	float TurnDirection(bool right);
+	// 공 방향 바꾸기
+	void TurnDirection(bool right);
 
 	UPROPERTY(EditAnywhere) // 공이 현재 바라보는 방향으로, Z=0이고 Normalized
-	FVector CurrentHeadVector;
+	FVector FacingHoleCupVector;
 
-	FVector ImpulseAmount; // 벡터로 변환된 공 발사방향
+	//FVector ImpulseAmount; // 벡터로 변환된 공 발사방향
 
 	UPROPERTY(EditAnywhere)
 	FVector TorqueAmount;
@@ -95,7 +92,7 @@ public:
 
 	// 공 치기
 	UFUNCTION()
-	bool Launch(float power, float dir);
+	bool Launch(float power, float precisionValue);
 
 	/// 샷 이후 공이 처음으로 땅에 닿았는지 여부
 	bool HasBallHitGround = false;
@@ -152,4 +149,7 @@ public:
 
 	// 태그
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
+
+	// 공이 홀컵을 바라보게 설정
+	void FaceHoleCup();
 };

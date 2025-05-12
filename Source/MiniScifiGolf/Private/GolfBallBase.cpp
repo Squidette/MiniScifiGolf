@@ -16,6 +16,20 @@
 
 #define GOLFBALLBASE_RADIUS 3.0f
 
+void AGolfBallBase::FaceHoleCup()
+{
+	if (!HoleCup) return;
+
+	// 현재 방향 설정
+	FacingHoleCupVector = HoleCup->GetActorLocation() - GetActorLocation();
+	FacingHoleCupVector.Z = 0;
+	FacingHoleCupVector.Normalize();
+
+	// 현재 방향을 float 각도로 저장
+	FRotator Rot = FacingHoleCupVector.Rotation();
+	SetCurrentHeadDegree(Rot.Yaw);
+}
+
 // Sets default values
 AGolfBallBase::AGolfBallBase()
 {
@@ -78,6 +92,12 @@ AGolfBallBase::AGolfBallBase()
 	}
 }
 
+void AGolfBallBase::SetCurrentHeadDegree(float newValue)
+{
+	CurrentHeadDegree = newValue;
+	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
+}
+
 // Called when the game starts or when spawned
 void AGolfBallBase::BeginPlay()
 {
@@ -108,28 +128,18 @@ void AGolfBallBase::BeginPlay()
 	//float ForceX = LaunchFullForce * FMath::Cos(LaunchAngleRadians);
 	//float ForceZ = LaunchFullForce * FMath::Sin(LaunchAngleRadians);
 	//ImpulseAmount =  FVector(ForceX, 0.0f, ForceZ);
-
-	// 현재 방향 설정
-	CurrentHeadVector = HoleCup->GetActorLocation() - GetActorLocation();
-	CurrentHeadVector.Z = 0;
-	CurrentHeadVector.Normalize();
-
-	// 현재 방향을 float 각도로 저장
-	FRotator Rot = CurrentHeadVector.Rotation();
-	CurrentHeadDegree = Rot.Yaw;
-	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
 }
 
 // Called every frame
 void AGolfBallBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
+
 	if (PhysicsSimulated)
 	{
 		// 마그누스 효과
 		FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
-			SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+		                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
 		if (HasBallHitGround) MagnusForce.Z = 0.0f; // 땅에 구를때는 이거라도 없애줘야 그나마 자연스러워진다
 		SphereComp->AddForce(MagnusForce);
 
@@ -156,13 +166,15 @@ void AGolfBallBase::Tick(float DeltaTime)
 			PhysicsSimulate(false);
 
 			UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
-			UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
+			UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
+			       GetActorLocation().Z);
 		}
 	}
 
 	// 디버그 스트링
 	float size = SphereComp->GetPhysicsLinearVelocity().Size();
-	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0, true, 1);
+	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0,
+	                true, 1);
 	//DrawDebugString(GetWorld(), GetActorLocation(), SphereComp->GetComponentVelocity().ToString(), nullptr, FColor::Magenta, 0, true, 2);
 }
 
@@ -206,44 +218,33 @@ bool AGolfBallBase::PhysicsSimulate(bool v)
 	return true;
 }
 
-float AGolfBallBase::TurnDirection(bool right)
+void AGolfBallBase::TurnDirection(bool right)
 {
-	if (right)
-	{
-		CurrentHeadDegree += HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
-	}
-	else
-	{
-		CurrentHeadDegree -= HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
-	}
-
-	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
-
-	return 0.0f;
+	float changeAmount = HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
+	if (right) { SetCurrentHeadDegree(CurrentHeadDegree + changeAmount); }
+	else { SetCurrentHeadDegree(CurrentHeadDegree - changeAmount); }
 }
 
 // 공 치기!
-bool AGolfBallBase::Launch(float power, float dir)
+bool AGolfBallBase::Launch(float power, float precisionValue)
 {
 	if (!PhysicsSimulate(true)) return false;
 
-	// 타구바에서 주어진 power과 dir을 기반으로 샷 계산
-	CurrentHeadDegree += dir * AccuracyRate;
+	// 전달받은 정확도를 기준으로 땅(XY)축 방향 계산
+	FRotator Rot(0.f, CurrentHeadDegree + precisionValue * PrecisionRate, 0.0f);
+	FVector finalXYDirection = Rot.Vector();
 
-	FRotator Rot(0.f, CurrentHeadDegree, 0.f);
-	CurrentHeadVector = Rot.Vector();
+	// 힘 계산
+	float launchAngleInRadians = FMath::DegreesToRadians(LaunchAngleDegree);
+	float verticalComp = FMath::Sin(launchAngleInRadians);
+	float horizontalComp = FMath::Cos(launchAngleInRadians);
 
-	float LaunchAngleInRadians = FMath::DegreesToRadians(LaunchAngleDegree);
-	float VerticalComponent = FMath::Sin(LaunchAngleInRadians);
-	float HorizontalComponent = FMath::Cos(LaunchAngleInRadians);
+	FVector horizontalDir = finalXYDirection * horizontalComp;
+	FVector launchVelocityDir = horizontalDir;
+	launchVelocityDir.Z = verticalComp;
 
-	FVector HorizontalDirection = CurrentHeadVector * HorizontalComponent;
-	FVector LaunchVelocityDirection = HorizontalDirection;
-	LaunchVelocityDirection.Z = VerticalComponent;
-
-	ImpulseAmount = LaunchVelocityDirection * LaunchFullForce;
-
-	FVector finalForce = ImpulseAmount * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
+	// 현재 골프채의 최대힘 크기와 타구바에서 전달받은 힘을 곱해서 최종 힘 벡터 계산
+	FVector finalForce = launchVelocityDir * LaunchFullForce * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
 	SphereComp->AddImpulse(finalForce, TEXT("None"), false);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
 
@@ -308,6 +309,6 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 			SphereComp->SetAngularDamping(AnglularDamping_Rolling);
 		}
 	}
-	
+
 	BallHitGroundLastFrame = true;
 }

@@ -11,7 +11,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/SphereComponent.h"
 #include "InputMappingContext.h"
-#include "MovieSceneTracksComponentTypes.h"
 #include "PlayerAnim.h"
 #include "Camera/CameraActor.h"
 
@@ -92,7 +91,7 @@ void APlayerCharacter::BeginPlay()
 		{
 			FieldWidget = FieldGameModeBase->FieldWidget;
 
-			FieldWidget->OnShotMade.BindDynamic(this, &APlayerCharacter::OnFieldFire);
+			FieldWidget->OnShotBarEnded.BindDynamic(this, &APlayerCharacter::OnShotMade);
 		}
 	}
 
@@ -113,19 +112,6 @@ void APlayerCharacter::BeginPlay()
 	else
 	{
 		Ball->OnBallStopped.BindDynamic(this, &APlayerCharacter::OnBallStopped);
-
-		// 플레이어를 공에 붙인다
-		USceneComponent* BallRootComp = Cast<USceneComponent>(Ball->GetRootComponent());
-		GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
-		GetRootComponent()->SetRelativeLocation(PlayerOffsetFromBall);
-
-		// 카메라도 붙인다
-		if (FieldGameModeBase)
-		{
-			FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(
-				BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
-			FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
-		}
 	}
 
 	// 애니메이션 블루프린트 저장
@@ -135,16 +121,19 @@ void APlayerCharacter::BeginPlay()
 
 		if (Anim)
 		{
-			Anim->OnEnterAnimEnd.BindDynamic(this, &APlayerCharacter::OnAnimEnterEnd);
+			Anim->OnEnterAnimEnd.BindDynamic(this, &APlayerCharacter::OnEnterAnimationEnd);
+			Anim->OnShotAnimEnd.BindDynamic(this, &APlayerCharacter::OnShotAnimationEnd);
 		}
 	}
 
-	SetCurrentState(EPlayerState::SHOTPREP);
+	SetCurrentState(EPlayerState::PRESHOTMOTION);
+	
+	PlacePlayerAndCameraAroundBall();
 }
 
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (FieldWidget) { FieldWidget->OnShotMade.Unbind(); }
+	if (FieldWidget) { FieldWidget->OnShotBarEnded.Unbind(); }
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -171,9 +160,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 	if (IA_Turn)
 	{
-		Input->BindAction(IA_Turn, ETriggerEvent::Started, this, &APlayerCharacter::OnTurnInputStart);
 		Input->BindAction(IA_Turn, ETriggerEvent::Triggered, this, &APlayerCharacter::OnTurnInput);
-		Input->BindAction(IA_Turn, ETriggerEvent::Completed, this, &APlayerCharacter::OnTurnInputEnd);
 	}
 	if (IA_LongerClub)
 	{
@@ -195,8 +182,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 {
-	if (CurrentState != EPlayerState::SHOTPREP) return;
-	UE_LOG(LogTemp, Display, TEXT("ShotInput"));
+	if (CurrentState != EPlayerState::SHOTPREP && CurrentState != EPlayerState::SHOTBARRUN) return;
 
 	// 맵 보는 중 샷을 하려고 하면 맵에서 나간다
 	if (mapOpen)
@@ -207,7 +193,12 @@ void APlayerCharacter::OnShotInput(const FInputActionValue& v)
 
 	if (FieldWidget)
 	{
-		FieldWidget->PressShotBar();
+		bool isActivated = FieldWidget->PressShotBar();
+
+		if (isActivated)
+		{
+			SetCurrentState(EPlayerState::SHOTBARRUN);
+		}
 	}
 }
 
@@ -217,7 +208,7 @@ void APlayerCharacter::OnMapInput(const FInputActionValue& v)
 	UE_LOG(LogTemp, Display, TEXT("MapInput"));
 
 	// 이미 타구바가 움직이는 중이면 리턴한다
-	if (FieldWidget && FieldWidget->GetShotBarActivated()) return;
+	if (FieldWidget && FieldWidget->GetState() != EShotBarState::INACTIVE) return;
 
 	if (mapOpen) CloseMap();
 	else OpenMap();
@@ -239,14 +230,6 @@ void APlayerCharacter::OnTurnInput(const FInputActionValue& v)
 			Ball->TurnDirection(false);
 		}
 	}
-}
-
-void APlayerCharacter::OnTurnInputStart(const struct FInputActionValue& v)
-{
-}
-
-void APlayerCharacter::OnTurnInputEnd(const struct FInputActionValue& v)
-{
 }
 
 void APlayerCharacter::OnLongerClubInput(const FInputActionValue& v)
@@ -296,30 +279,80 @@ void APlayerCharacter::OnBallStopped()
 	}
 }
 
-// 위젯에서 샷이 확정되었을 때 정보가 보내짐
-void APlayerCharacter::OnFieldFire(float power, float dir)
+void APlayerCharacter::AttachPlayerAndCameraToBall()
 {
+	if (IsPlayerAndCameraAttachedToBall == true) return;
+	
+	// 플레이어를 공에 붙인다
+	USceneComponent* BallRootComp = Cast<USceneComponent>(Ball->GetRootComponent());
+	GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
+	GetRootComponent()->SetRelativeLocation(PlayerOffsetFromBall);
+
+	// 카메라도 붙인다
+	if (FieldGameModeBase)
+	{
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(
+			BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
+	}
+	
+	IsPlayerAndCameraAttachedToBall = true;
+}
+
+void APlayerCharacter::DettachPlayerAndCameraFromBall()
+{
+	if (IsPlayerAndCameraAttachedToBall == false) return;
+
 	// 공에서 캐릭터와 카메라를 뗀다
 	GetRootComponent()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-
 	if (FieldGameModeBase)
 	{
 		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->DetachFromComponent(
 			FDetachmentTransformRules::KeepWorldTransform);
 	}
 
-	if (!Ball->Launch(power, dir))
+	IsPlayerAndCameraAttachedToBall = false;
+}
+
+void APlayerCharacter::PlacePlayerAndCameraAroundBall()
+{
+	FTransform ballTransform = Ball->GetActorTransform();
+	GetRootComponent()->SetWorldLocation(ballTransform.TransformPosition(PlayerOffsetFromBall));
+	if (FieldGameModeBase)
 	{
-		CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetWorldLocation(ballTransform.TransformPosition(PlayerCameraOffsetFromBall));
 	}
+}
+
+void APlayerCharacter::OnShotMade(bool success, float power, float dir)
+{
+	// 샷 모션 상태로 넘어감
+	SetCurrentState(EPlayerState::SHOT);
+	
+	// 성공시
+	if (success)
+	{
+		// // 공 발사
+		// Ball->Launch(power, dir);
+		//
+		// if (!Ball->Launch(power, dir))
+		// {
+		// 	CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));
+		// }
+		// else
+		// {
+		// 	SetCurrentState(EPlayerState::FLYBALL); // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
+		//
+		// 	if (FieldGameModeBase)
+		// 	{
+		// 		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+		// 	}
+		// }
+	}
+	// 실패시
 	else
 	{
-		SetCurrentState(EPlayerState::FLYBALL); // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
-
-		if (FieldGameModeBase)
-		{
-			FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
-		}
+		
 	}
 }
 
@@ -353,16 +386,46 @@ bool APlayerCharacter::CloseMap()
 
 void APlayerCharacter::SetCurrentState(EPlayerState newState)
 {
-	if (CurrentState != newState) return;
+	// 이미 해당 당태면 리턴
+	if (CurrentState == newState) return;
 
+	// // exit
+	// switch (CurrentState)
+	// {
+	// default:
+	// 	break;
+	// }
+	
 	CurrentState = newState;
+	
+	// enter
+	switch (CurrentState)
+	{
+	case EPlayerState::SHOTPREP:
+		AttachPlayerAndCameraToBall();
+		break;
+	case EPlayerState::FLYBALL:
+		DettachPlayerAndCameraFromBall();
+		break;
+	default:
+		break;
+	}
+	
+	// 애니메이션에도 상태변화 전달
 	if (Anim)
 	{
 		Anim->SetPlayerState(CurrentState);
 	}
+
+	CUSTOMLOG(TEXT("플레이어 상태 %s로 변화"), *UEnum::GetValueAsString(CurrentState));
 }
 
-void APlayerCharacter::OnAnimEnterEnd()
+void APlayerCharacter::OnEnterAnimationEnd()
 {
 	SetCurrentState(EPlayerState::SHOTPREP);
+}
+
+void APlayerCharacter::OnShotAnimationEnd()
+{
+	SetCurrentState(EPlayerState::FLYBALL);
 }
