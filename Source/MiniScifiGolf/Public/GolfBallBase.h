@@ -49,9 +49,9 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	void OnEnterRolling();
 	void TickRolling();
 	
-	// 현재 공의 앞방향
-	float CurrentHeadDegree;
-	void SetCurrentHeadDegree(float newValue);
+	// 현재 공의 앞방향 (XY축)
+	float DesiredHeadingDegree;
+	void ApplyDesiredHeadingDegree(float newValue);
 
 	// 마그누스 효과 적용
 	void ApplyMagnusForce(bool ignoreZ = false);
@@ -91,7 +91,7 @@ public:
 
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
 	UPROPERTY(EditAnywhere) // 공이 땅과 이루는 발사각, 0~90사이
-	float LaunchAngleDegree = 40.0f;
+	float LaunchAngleDegree = 28.0f;
 
 	UPROPERTY(EditAnywhere)
 	float LaunchFullForce = 950.0f; // 100% 힘의 세기로, 채 종류에 의해 결정

@@ -127,9 +127,7 @@ void APlayerCharacter::BeginPlay()
 		}
 	}
 
-	SetCurrentState(EPlayerState::PRESHOTMOTION);
-	
-	PlacePlayerAndCameraAroundBall();
+	SetCurrentState(EPlayerState::PRESHOTMOTION);	
 }
 
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -271,7 +269,6 @@ void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
 void APlayerCharacter::OnBallStopped()
 {
 	// 플레이어 리셋
-	PlacePlayerAndCameraAroundBall();
 	SetCurrentState(EPlayerState::PRESHOTMOTION);
 
 	// 카메라 변경
@@ -283,12 +280,14 @@ void APlayerCharacter::OnBallStopped()
 
 void APlayerCharacter::AttachPlayerAndCameraToBall()
 {
+	// 이미 붙어있다면 리턴한다
 	if (IsPlayerAndCameraAttachedToBall == true) return;
 	
 	// 플레이어를 공에 붙인다
 	USceneComponent* BallRootComp = Cast<USceneComponent>(Ball->GetRootComponent());
 	GetRootComponent()->AttachToComponent(BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
 	GetRootComponent()->SetRelativeLocation(PlayerOffsetFromBall);
+	GetRootComponent()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 
 	// 카메라도 붙인다
 	if (FieldGameModeBase)
@@ -296,13 +295,17 @@ void APlayerCharacter::AttachPlayerAndCameraToBall()
 		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->AttachToComponent(
 			BallRootComp, FAttachmentTransformRules::KeepRelativeTransform);
 		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeLocation(PlayerCameraOffsetFromBall);
+		FieldGameModeBase->GetPlayerCamera()->GetRootComponent()->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 	
 	IsPlayerAndCameraAttachedToBall = true;
+
+	CUSTOMLOG(TEXT("플레이어와 카메라를 공에 붙입니다"), *UEnum::GetValueAsString(CurrentState));
 }
 
 void APlayerCharacter::DettachPlayerAndCameraFromBall()
 {
+	// 이미 떨어져 있다면 리턴한다
 	if (IsPlayerAndCameraAttachedToBall == false) return;
 
 	// 공에서 캐릭터와 카메라를 뗀다
@@ -314,6 +317,8 @@ void APlayerCharacter::DettachPlayerAndCameraFromBall()
 	}
 
 	IsPlayerAndCameraAttachedToBall = false;
+
+	CUSTOMLOG(TEXT("플레이어와 카메라를 공에서 뗍니다"), *UEnum::GetValueAsString(CurrentState));
 }
 
 void APlayerCharacter::PlacePlayerAndCameraAroundBall()
@@ -398,6 +403,9 @@ void APlayerCharacter::SetCurrentState(EPlayerState newState)
 	// enter
 	switch (CurrentState)
 	{
+	case EPlayerState::PRESHOTMOTION:
+		PlacePlayerAndCameraAroundBall();
+		break;
 	case EPlayerState::SHOTPREP:
 		AttachPlayerAndCameraToBall();
 		break;
@@ -424,10 +432,10 @@ void APlayerCharacter::OnEnterAnimationEnd()
 
 void APlayerCharacter::OnShotAnimationEnd()
 {
-	//SetCurrentState(EPlayerState::FLYBALL);
 }
 
 void APlayerCharacter::OnBallHitAnimation()
 {
+	SetCurrentState(EPlayerState::FLYBALL);
 	ShotBall();
 }

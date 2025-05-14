@@ -27,7 +27,7 @@ void AGolfBallBase::FaceHoleCup()
 
 	// 현재 방향을 float 각도로 저장
 	FRotator Rot = FacingHoleCupVector.Rotation();
-	SetCurrentHeadDegree(Rot.Yaw);
+	ApplyDesiredHeadingDegree(Rot.Yaw);
 }
 
 // Sets default values
@@ -87,10 +87,10 @@ AGolfBallBase::AGolfBallBase()
 	}
 }
 
-void AGolfBallBase::SetCurrentHeadDegree(float newValue)
+void AGolfBallBase::ApplyDesiredHeadingDegree(float newValue)
 {
-	CurrentHeadDegree = newValue;
-	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
+	DesiredHeadingDegree = newValue;
+	SetActorRotation(FRotator(0.f, DesiredHeadingDegree, 0.f));
 }
 
 void AGolfBallBase::ApplyMagnusForce(bool ignoreZ)
@@ -114,13 +114,11 @@ void AGolfBallBase::CheckConsecutiveCollision()
 		ConsecutiveCollision = 0;
 	}
 	BallHitGroundLastFrame = false;
-
-	UE_LOG(LogTemp, Warning, TEXT("Consecute Collision %d"), ConsecutiveCollision);
 }
 
 FVector AGolfBallBase::CalculateFinalForce(float power, float precision)
 {
-	FRotator Rot(0.f, CurrentHeadDegree + precision * PrecisionRate, 0.0f);
+	FRotator Rot(0.f, DesiredHeadingDegree + precision * PrecisionRate, 0.0f);
 	FVector finalXYDirection = Rot.Vector();
 
 	// 힘 계산
@@ -136,6 +134,7 @@ FVector AGolfBallBase::CalculateFinalForce(float power, float precision)
 	return launchVelocityDir * LaunchFullForce * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
 }
 
+// 에너미 FSM
 void AGolfBallBase::SetState(EBallState newState)
 {
 	// 이미 해당 상태면 리턴
@@ -176,6 +175,9 @@ void AGolfBallBase::SetState(EBallState newState)
 
 void AGolfBallBase::OnEnterStopped()
 {
+	// 바라보는 방향 초기화
+	FaceHoleCup();
+
 	// 시뮬레이션 끄기
 	SphereComp->SetSimulatePhysics(false);
 	if (SphereComp) { SphereComp->OnComponentHit.RemoveDynamic(this, &AGolfBallBase::OnCollision); }
@@ -192,9 +194,6 @@ void AGolfBallBase::OnEnterStopped()
 	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
 	BallHitGroundLastFrame = false;
 	ConsecutiveCollision = 0;
-
-	// 바라보는 방향 초기화
-	FaceHoleCup();
 }
 
 void AGolfBallBase::TickStopped()
@@ -315,8 +314,8 @@ void AGolfBallBase::Tick(float DeltaTime)
 void AGolfBallBase::TurnDirection(bool right)
 {
 	float changeAmount = HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
-	if (right) { SetCurrentHeadDegree(CurrentHeadDegree + changeAmount); }
-	else { SetCurrentHeadDegree(CurrentHeadDegree - changeAmount); }
+	if (right) { ApplyDesiredHeadingDegree(DesiredHeadingDegree + changeAmount); }
+	else { ApplyDesiredHeadingDegree(DesiredHeadingDegree - changeAmount); }
 }
 
 // 공 치기!
@@ -366,7 +365,7 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 		adjustedVel.Y = adjustedVel.Y / HitGroundXYVelocityDecelerationRate;
 		adjustedVel.Z = adjustedVel.Z / HitGroundZVelocityDecelerationRate;
 		SphereComp->SetPhysicsLinearVelocity(adjustedVel);
-		UE_LOG(LogTemp, Warning, TEXT("땅 충돌로 감속"));
+		UE_LOG(LogTemp, Warning, TEXT("충돌로 인한 감속"));
 	}
 
 	// Flying -> Bouncing
