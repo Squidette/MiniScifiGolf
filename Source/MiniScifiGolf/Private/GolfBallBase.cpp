@@ -41,7 +41,6 @@ AGolfBallBase::AGolfBallBase()
 		SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("Collider"));
 		RootComponent = SphereComp;
 		SphereComp->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		//SphereComp->SetSimulatePhysics(true);
 		SphereComp->SetNotifyRigidBodyCollision(true);
 		SphereComp->InitSphereRadius(GOLFBALLBASE_RADIUS);
 		SphereComp->SetUseCCD(true);
@@ -72,10 +71,6 @@ AGolfBallBase::AGolfBallBase()
 		SpringArmComp->SetupAttachment(RootComponent);
 	}
 
-	//// CameraComp
-	//CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	//CameraComp->SetupAttachment(SpringArmComp);
-
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshAsset(
 		TEXT("Script/Engine.StaticMesh'/Engine/BasicShapes/Sphere.Sphere'"));
 	if (MeshAsset.Succeeded())
@@ -98,13 +93,168 @@ void AGolfBallBase::SetCurrentHeadDegree(float newValue)
 	SetActorRotation(FRotator(0.f, CurrentHeadDegree, 0.f));
 }
 
+void AGolfBallBase::ApplyMagnusForce(bool ignoreZ)
+{
+	// 마그누스 효과
+	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
+	                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+	if (ignoreZ) MagnusForce.Z = 0.0f; // 공이 물수제비 하는 것을 막아보기 위해 추가
+	SphereComp->AddForce(MagnusForce);
+}
+
+void AGolfBallBase::CheckConsecutiveCollision()
+{
+	// 이전 프레임에 충돌했다면 카운트 올리기
+	if (BallHitGroundLastFrame)
+	{
+		ConsecutiveCollision = FMath::Min(ConsecutiveCollision + 1, MAX_int32);
+	}
+	else
+	{
+		ConsecutiveCollision = 0;
+	}
+	BallHitGroundLastFrame = false;
+
+	UE_LOG(LogTemp, Warning, TEXT("Consecute Collision %d"), ConsecutiveCollision);
+}
+
+FVector AGolfBallBase::CalculateFinalForce(float power, float precision)
+{
+	FRotator Rot(0.f, CurrentHeadDegree + precision * PrecisionRate, 0.0f);
+	FVector finalXYDirection = Rot.Vector();
+
+	// 힘 계산
+	float launchAngleInRadians = FMath::DegreesToRadians(LaunchAngleDegree);
+	float verticalComp = FMath::Sin(launchAngleInRadians);
+	float horizontalComp = FMath::Cos(launchAngleInRadians);
+
+	FVector horizontalDir = finalXYDirection * horizontalComp;
+	FVector launchVelocityDir = horizontalDir;
+	launchVelocityDir.Z = verticalComp;
+
+	// 현재 골프채의 최대힘 크기와 타구바에서 전달받은 힘을 곱해서 최종 힘 벡터 계산
+	return launchVelocityDir * LaunchFullForce * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
+}
+
+void AGolfBallBase::SetState(EBallState newState)
+{
+	// 이미 해당 상태면 리턴
+	if (newState == CurrentState) return;
+
+	// 기존 상태에서 나갈 때 할 일
+	switch (CurrentState)
+	{
+	case EBallState::STOPPED:
+		OnExitStopped();
+		break;
+	default:
+		CUSTOMLOG(TEXT("공의 %s상태에 지정된 EXIT함수 없음"), *UEnum::GetValueAsString(CurrentState));
+		break;
+	}
+
+	// 상태 변수 바꾸기
+	CurrentState = newState;
+	CUSTOMLOG(TEXT("공이 %s상태 진입"), *UEnum::GetValueAsString(CurrentState));
+
+	// 새로운 상태에 들어갈 때 할일
+	switch (CurrentState)
+	{
+	case EBallState::STOPPED:
+		OnEnterStopped();
+		break;
+	case EBallState::FLYING:
+		OnEnterFlying();
+		break;
+	case EBallState::BOUNCING:
+		OnEnterBouncing();
+		break;
+	case EBallState::ROLLING:
+		OnEnterRolling();
+		break;
+	}
+}
+
+void AGolfBallBase::OnEnterStopped()
+{
+	// 시뮬레이션 끄기
+	SphereComp->SetSimulatePhysics(false);
+	if (SphereComp) { SphereComp->OnComponentHit.RemoveDynamic(this, &AGolfBallBase::OnCollision); }
+
+	// 델리게이트 실행
+	if (OnBallStopped.IsBound()) { OnBallStopped.Execute(); }
+	
+	UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
+	UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
+	       GetActorLocation().Z);
+
+	// 공 속도와 임시변수들 초기화
+	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
+	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
+	BallHitGroundLastFrame = false;
+	ConsecutiveCollision = 0;
+
+	// 바라보는 방향 초기화
+	FaceHoleCup();
+}
+
+void AGolfBallBase::TickStopped()
+{
+}
+
+void AGolfBallBase::OnExitStopped()
+{
+	// 시뮬레이션 켜기
+	SphereComp->SetSimulatePhysics(true);
+	if (SphereComp) { SphereComp->OnComponentHit.AddDynamic(this, &AGolfBallBase::OnCollision); }
+}
+
+void AGolfBallBase::OnEnterFlying()
+{
+}
+
+void AGolfBallBase::TickFlying()
+{
+	ApplyMagnusForce();
+}
+
+void AGolfBallBase::OnEnterBouncing()
+{
+}
+
+void AGolfBallBase::TickBouncing()
+{
+	ApplyMagnusForce(true);
+	CheckConsecutiveCollision();
+}
+
+void AGolfBallBase::OnEnterRolling()
+{
+	// 구르기 진입시 Damping값을 바꾼다
+	if (SphereComp)
+	{
+		SphereComp->SetLinearDamping(LinearDamping_Rolling);
+		SphereComp->SetAngularDamping(AnglularDamping_Rolling);
+	}
+}
+
+void AGolfBallBase::TickRolling()
+{
+	ApplyMagnusForce();
+	CheckConsecutiveCollision();
+
+	// 공 멈춤 체크
+	if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
+	{
+		SetState(EBallState::STOPPED);
+	}
+}
+
 // Called when the game starts or when spawned
 void AGolfBallBase::BeginPlay()
 {
 	Super::BeginPlay();
 
 	// 시뮬레이션용
-	InitialTransform = GetActorTransform();
 	LastLocation = GetActorLocation();
 	GetWorldTimerManager().SetTimer(VisualizationHandle, this, &AGolfBallBase::Visualize, VisualizationCycle, true);
 
@@ -120,14 +270,14 @@ void AGolfBallBase::BeginPlay()
 
 	if (!HoleCup)
 	{
-		CUSTOMLOG(TEXT("%s"), TEXT("Cannot find Holecup"));
+		CUSTOMLOG(TEXT("%s"), TEXT("홀컵 못찾음"));
 	}
 
-	//// 발사각과 힘을 벡터로 변환
-	//float LaunchAngleRadians = FMath::DegreesToRadians(LaunchAngleDegree);
-	//float ForceX = LaunchFullForce * FMath::Cos(LaunchAngleRadians);
-	//float ForceZ = LaunchFullForce * FMath::Sin(LaunchAngleRadians);
-	//ImpulseAmount =  FVector(ForceX, 0.0f, ForceZ);
+	// 홀컵 보게 하기
+	FaceHoleCup();
+
+	// 멈춘 상태로 초기화
+	SetState(EBallState::STOPPED);
 }
 
 // Called every frame
@@ -135,40 +285,21 @@ void AGolfBallBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (PhysicsSimulated)
+	// FSM Tick
+	switch (CurrentState)
 	{
-		// 마그누스 효과
-		FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
-		                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
-		if (HasBallHitGround) MagnusForce.Z = 0.0f; // 땅에 구를때는 이거라도 없애줘야 그나마 자연스러워진다
-		SphereComp->AddForce(MagnusForce);
-
-		// 충돌의 연속 체크
-		if (BallHitGroundLastFrame)
-		{
-			if (ConsecutiveCollision < FMath::Max(HitGroundDecelerationLimitFrame, ConsecutiveCollisionFramesForRoll))
-			{
-				ConsecutiveCollision++;
-				//UE_LOG(LogTemp, Warning, TEXT("ConsecutiveCollision: %d"), ConsecutiveCollision);
-			}
-		}
-		else
-		{
-			ConsecutiveCollision = 0;
-		}
-		BallHitGroundLastFrame = false;
-
-		// 공 멈춤 체크
-		if (IsRolling && !HasStopped && SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
-		{
-			HasStopped = true;
-			OnBallStopped.ExecuteIfBound();
-			PhysicsSimulate(false);
-
-			UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
-			UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
-			       GetActorLocation().Z);
-		}
+	case EBallState::STOPPED:
+		TickStopped();
+		break;
+	case EBallState::FLYING:
+		TickFlying();
+		break;
+	case EBallState::BOUNCING:
+		TickBouncing();
+		break;
+	case EBallState::ROLLING:
+		TickRolling();
+		break;
 	}
 
 	// 디버그 스트링
@@ -176,46 +307,9 @@ void AGolfBallBase::Tick(float DeltaTime)
 	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0,
 	                true, 1);
 	//DrawDebugString(GetWorld(), GetActorLocation(), SphereComp->GetComponentVelocity().ToString(), nullptr, FColor::Magenta, 0, true, 2);
-}
 
-bool AGolfBallBase::PhysicsSimulate(bool v)
-{
-	if (v == PhysicsSimulated)
-	{
-		CUSTOMLOG(TEXT("PhysicsSimulate 상태가 이미 %b"), v);
-		return false;
-	}
-
-	SphereComp->SetSimulatePhysics(v);
-
-	if (v) // start simulate
-	{
-		if (SphereComp)
-		{
-			SphereComp->OnComponentHit.AddDynamic(this, &AGolfBallBase::OnCollision);
-		}
-
-		PhysicsSimulated = true;
-	}
-	else // end simulate
-	{
-		if (SphereComp)
-		{
-			SphereComp->OnComponentHit.RemoveDynamic(this, &AGolfBallBase::OnCollision);
-		}
-
-		SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
-		SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
-
-		PhysicsSimulated = false;
-	}
-
-	IsRolling = false;
-	HasStopped = false;
-	BallHitGroundLastFrame = false;
-	ConsecutiveCollision = 0;
-
-	return true;
+	DrawDebugLine(GetWorld(), GetActorLocation(), (GetActorLocation() + GetVelocity() * 100), FColor::Magenta, false,
+	              0);
 }
 
 void AGolfBallBase::TurnDirection(bool right)
@@ -226,25 +320,22 @@ void AGolfBallBase::TurnDirection(bool right)
 }
 
 // 공 치기!
-bool AGolfBallBase::Launch(float power, float precisionValue)
+bool AGolfBallBase::Launch(float powerValue, float precisionValue)
 {
-	if (!PhysicsSimulate(true)) return false;
+	// 공이 멈춤 상태가 아니라면(이미 움직이는 상태라면) 리턴
+	if (CurrentState != EBallState::STOPPED)
+	{
+		CUSTOMLOG(TEXT("%s"), TEXT("공이 이미 움직이는 중이므로 리턴"));
+		return false;
+	}
+
+	// 날으는(?) 상태로 전환
+	SetState(EBallState::FLYING);
+	CUSTOMLOG(TEXT("Ball: Launch Ball at %f power and %f precision"), powerValue, precisionValue);
 
 	// 전달받은 정확도를 기준으로 땅(XY)축 방향 계산
-	FRotator Rot(0.f, CurrentHeadDegree + precisionValue * PrecisionRate, 0.0f);
-	FVector finalXYDirection = Rot.Vector();
-
-	// 힘 계산
-	float launchAngleInRadians = FMath::DegreesToRadians(LaunchAngleDegree);
-	float verticalComp = FMath::Sin(launchAngleInRadians);
-	float horizontalComp = FMath::Cos(launchAngleInRadians);
-
-	FVector horizontalDir = finalXYDirection * horizontalComp;
-	FVector launchVelocityDir = horizontalDir;
-	launchVelocityDir.Z = verticalComp;
-
-	// 현재 골프채의 최대힘 크기와 타구바에서 전달받은 힘을 곱해서 최종 힘 벡터 계산
-	FVector finalForce = launchVelocityDir * LaunchFullForce * power; // finalforce에 어떤 연산을 가해야 선형적이어진다
+	FVector finalForce = CalculateFinalForce(powerValue, precisionValue);
+	UE_LOG(LogTemp, Warning, TEXT("launched ball at finalforce of %s"), *finalForce.ToString());
 	SphereComp->AddImpulse(finalForce, TEXT("None"), false);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
 
@@ -253,62 +344,49 @@ bool AGolfBallBase::Launch(float power, float precisionValue)
 
 void AGolfBallBase::Visualize()
 {
-	if (PhysicsSimulated && LastLocation != GetActorLocation())
+	if (CurrentState != EBallState::STOPPED && LastLocation != GetActorLocation())
 	{
 		DrawDebugLine(GetWorld(), LastLocation, GetActorLocation(), FColor::Red, true);
 	}
 	LastLocation = GetActorLocation();
 }
 
-void AGolfBallBase::ResetGolfBall()
-{
-	SetActorTransform(InitialTransform);
-	//SphereComp->ComponentVelocity = FVector(0, 0, 0);
-	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
-	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
-
-	PhysicsSimulated = false;
-	IsRolling = false;
-	HasStopped = false;
-	BallHitGroundLastFrame = false;
-	ConsecutiveCollision = 0;
-}
-
 void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor,
                                 UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if (!PhysicsSimulated) return;
+	UE_LOG(LogTemp, Warning, TEXT("AGolfBallBase::OnCollision: %s"), *OtherActor->GetActorNameOrLabel());
 
-	// 처음 땅에 닿았을 때
-	if (!HasBallHitGround)
-	{
-		// 비거리 측정
-		UE_LOG(LogTemp, Warning, TEXT("비거리: %f, %f, %f"), Hit.Location.X, Hit.Location.Y, Hit.Location.Z);
+	if (CurrentState == EBallState::STOPPED) return;
 
-		HasBallHitGround = true;
-	}
-
-	// 감속
-	if (ConsecutiveCollision < HitGroundDecelerationLimitFrame)
+	// 땅에 부딪힐 때마다 감속
+	if (ConsecutiveCollision == 0)
 	{
 		FVector adjustedVel = SphereComp->GetPhysicsLinearVelocity();
 		adjustedVel.X = adjustedVel.X / HitGroundXYVelocityDecelerationRate;
 		adjustedVel.Y = adjustedVel.Y / HitGroundXYVelocityDecelerationRate;
 		adjustedVel.Z = adjustedVel.Z / HitGroundZVelocityDecelerationRate;
 		SphereComp->SetPhysicsLinearVelocity(adjustedVel);
+		UE_LOG(LogTemp, Warning, TEXT("땅 충돌로 감속"));
 	}
 
-	// 구르는 상태 판정
-	// 해당 프레임 이상 땅에 닿아있는지?
-	if (!IsRolling && ConsecutiveCollision >= ConsecutiveCollisionFramesForRoll)
+	// Flying -> Bouncing
+	if (CurrentState == EBallState::FLYING)
 	{
-		IsRolling = true;
-		if (SphereComp)
+		// 비거리 측정
+		UE_LOG(LogTemp, Warning, TEXT("비거리: %f, %f, %f"), Hit.Location.X, Hit.Location.Y, Hit.Location.Z);
+		SetState(EBallState::BOUNCING);
+	}
+
+	// Bouncing -> Rolling
+	else if (CurrentState == EBallState::BOUNCING)
+	{
+		// 해당 프레임 이상 땅에 닿아있었다면 Rolling 상태로 전환
+		if (ConsecutiveCollision >= ConsecutiveCollisionFramesForRoll)
 		{
-			SphereComp->SetLinearDamping(LinearDamping_Rolling);
-			SphereComp->SetAngularDamping(AnglularDamping_Rolling);
+			SetState(EBallState::ROLLING);
 		}
 	}
 
+	// 공이 땅에 닿았는지 기록
 	BallHitGroundLastFrame = true;
 }

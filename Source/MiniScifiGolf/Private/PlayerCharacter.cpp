@@ -8,8 +8,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "GolfBallBase.h"
 #include "FieldGameMode.h"
+#include "FieldWidget.h"
 #include "Kismet/GameplayStatics.h"
-#include "Components/SphereComponent.h"
 #include "InputMappingContext.h"
 #include "PlayerAnim.h"
 #include "Camera/CameraActor.h"
@@ -90,8 +90,8 @@ void APlayerCharacter::BeginPlay()
 		if (FieldGameModeBase)
 		{
 			FieldWidget = FieldGameModeBase->FieldWidget;
-
-			FieldWidget->OnShotBarEnded.BindDynamic(this, &APlayerCharacter::OnShotMade);
+			
+			FieldWidget->OnShotBarEnded.BindUObject(this, &APlayerCharacter::OnShotMade);
 		}
 	}
 
@@ -111,7 +111,7 @@ void APlayerCharacter::BeginPlay()
 	}
 	else
 	{
-		Ball->OnBallStopped.BindDynamic(this, &APlayerCharacter::OnBallStopped);
+		Ball->OnBallStopped.BindUObject(this, &APlayerCharacter::OnBallStopped);
 	}
 
 	// 애니메이션 블루프린트 저장
@@ -121,8 +121,9 @@ void APlayerCharacter::BeginPlay()
 
 		if (Anim)
 		{
-			Anim->OnEnterAnimEnd.BindDynamic(this, &APlayerCharacter::OnEnterAnimationEnd);
-			Anim->OnShotAnimEnd.BindDynamic(this, &APlayerCharacter::OnShotAnimationEnd);
+			Anim->OnEnterAnimEnd.BindUObject(this, &APlayerCharacter::OnEnterAnimationEnd);
+			Anim->OnShotAnimEnd.BindUObject(this, &APlayerCharacter::OnShotAnimationEnd);
+			Anim->OnBallHitAnim.BindUObject(this, &APlayerCharacter::OnBallHitAnimation);
 		}
 	}
 
@@ -269,8 +270,9 @@ void APlayerCharacter::OnMapVerticalInput(const struct FInputActionValue& v)
 // 공이 멈췄을 때
 void APlayerCharacter::OnBallStopped()
 {
-	// 플레이어가 공 쪽으로 간다
-	SetActorLocation(Ball->GetActorLocation() + PlayerOffsetFromBall);
+	// 플레이어 리셋
+	PlacePlayerAndCameraAroundBall();
+	SetCurrentState(EPlayerState::PRESHOTMOTION);
 
 	// 카메라 변경
 	if (FieldGameModeBase)
@@ -328,32 +330,11 @@ void APlayerCharacter::OnShotMade(bool success, float power, float dir)
 {
 	// 샷 모션 상태로 넘어감
 	SetCurrentState(EPlayerState::SHOT);
-	
-	// 성공시
-	if (success)
-	{
-		// // 공 발사
-		// Ball->Launch(power, dir);
-		//
-		// if (!Ball->Launch(power, dir))
-		// {
-		// 	CUSTOMLOG(TEXT("%s"), TEXT("Ball Launch fail"));
-		// }
-		// else
-		// {
-		// 	SetCurrentState(EPlayerState::FLYBALL); // 모션 넣으면 SHOT으로 바꾸자.. 임시로 FLYBALL
-		//
-		// 	if (FieldGameModeBase)
-		// 	{
-		// 		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
-		// 	}
-		// }
-	}
-	// 실패시
-	else
-	{
-		
-	}
+
+	TempSuccess = success;
+	TempPower = power;
+	TempDir = dir;
+
 }
 
 bool APlayerCharacter::OpenMap()
@@ -384,18 +365,34 @@ bool APlayerCharacter::CloseMap()
 	return true;
 }
 
+void APlayerCharacter::ShotBall()
+{
+	// 타구바 인풋 실패시 실수 샷으로 설정
+	if (!TempSuccess)
+	{
+		// 랜덤한 작은 파워로, 랜덤한 방향으로 치게된다
+		TempPower = FMath::RandRange(0.01f, 0.2f);
+		TempDir = FMath::RandRange(-1.0f, 1.0f);
+		CUSTOMLOG(TEXT("실패 샷 - 랜덤한 %f의 힘, %f의 정확도로 설정되어 Ball->Launch"), TempPower, TempDir);
+	}
+	else CUSTOMLOG(TEXT("타구바에서 전달된 %f의 힘, %f의 정확도로 Ball->Launch"), TempPower, TempDir);
+
+	if (Ball->Launch(TempPower, TempDir))
+	{
+		SetCurrentState(EPlayerState::FLYBALL);
+		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+	}
+	else
+	{
+		CUSTOMLOG(TEXT("Ball Launch 실패함"), TempPower, TempDir);
+	}
+}
+
 void APlayerCharacter::SetCurrentState(EPlayerState newState)
 {
 	// 이미 해당 당태면 리턴
 	if (CurrentState == newState) return;
 
-	// // exit
-	// switch (CurrentState)
-	// {
-	// default:
-	// 	break;
-	// }
-	
 	CurrentState = newState;
 	
 	// enter
@@ -427,5 +424,10 @@ void APlayerCharacter::OnEnterAnimationEnd()
 
 void APlayerCharacter::OnShotAnimationEnd()
 {
-	SetCurrentState(EPlayerState::FLYBALL);
+	//SetCurrentState(EPlayerState::FLYBALL);
+}
+
+void APlayerCharacter::OnBallHitAnimation()
+{
+	ShotBall();
 }

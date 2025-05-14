@@ -20,7 +20,7 @@ enum class EShotBarState : uint8
 };
 
 //DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnShotSignature, float, power, float, dir);
-DECLARE_DYNAMIC_DELEGATE_ThreeParams(FOnShotBarEnded, bool, success, float, power, float, precision);
+DECLARE_DELEGATE_ThreeParams(FOnShotBarEnded, bool, float, float);
 
 UCLASS()
 class MINISCIFIGOLF_API UFieldWidget : public UUserWidget
@@ -60,10 +60,9 @@ public:
 
 	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
-	UPROPERTY()
 	FOnShotBarEnded OnShotBarEnded;
 
-	// 리턴값 bool은 샷이 시작했는지를 리턴
+	// 타구바가 활성화되는 시점에만 true 반환
 	UFUNCTION()
 	bool PressShotBar();
 

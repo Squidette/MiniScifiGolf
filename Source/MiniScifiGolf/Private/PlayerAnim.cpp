@@ -5,12 +5,20 @@
 
 void UPlayerAnim::AnimNotify_EndEnter()
 {
-	OnEnterAnimEnd.ExecuteIfBound();
+	if (OnEnterAnimEnd.IsBound())
+		OnEnterAnimEnd.Execute();
 }
 
 void UPlayerAnim::AnimNotify_EndShot()
 {
-	OnShotAnimEnd.ExecuteIfBound();
+	if (OnShotAnimEnd.IsBound())
+		OnShotAnimEnd.Execute();
+}
+
+void UPlayerAnim::AnimNotify_BallHit()
+{
+	if (OnBallHitAnim.IsBound())
+		OnBallHitAnim.Execute();
 }
 
 void UPlayerAnim::SetPlayerState(EPlayerState playerState)

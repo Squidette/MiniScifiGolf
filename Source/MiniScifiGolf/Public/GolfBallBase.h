@@ -7,20 +7,64 @@
 #include "GameplayTagContainer.h"
 #include "GolfBallBase.generated.h"
 
-DECLARE_DYNAMIC_DELEGATE(FOnBallStopped);
+UENUM(BlueprintType)
+enum class EBallState : uint8
+{
+	STOPPED,
+	FLYING,
+	BOUNCING,
+	ROLLING
+};
+
+DECLARE_DELEGATE(FOnBallStopped);
 
 UCLASS()
 class MINISCIFIGOLF_API AGolfBallBase : public AActor
 {
 	GENERATED_BODY()
 
+	// 태그
 	UPROPERTY()
 	FGameplayTagContainer TagContainer;
 
+	// FSM
+	UPROPERTY(VisibleAnywhere)
+	EBallState CurrentState = EBallState::ROLLING; // STOPPED가 아닌 아무거나로 초기화
+	void SetState(EBallState newState);
+
+	// 공이 멈춰있는 상태
+	void OnEnterStopped();
+	void TickStopped();
+	void OnExitStopped();
+
+	// 공이 날아가는 상태
+	void OnEnterFlying();
+	void TickFlying();
+
+	// 공이 땅에 떨어진 후 튀기는 상태
+	void OnEnterBouncing();
+	void TickBouncing();
+
+	// 공이 땅에서 굴러가고 있는 상태
+	void OnEnterRolling();
+	void TickRolling();
+	
 	// 현재 공의 앞방향
 	float CurrentHeadDegree;
 	void SetCurrentHeadDegree(float newValue);
 
+	// 마그누스 효과 적용
+	void ApplyMagnusForce(bool ignoreZ = false);
+
+	// 충돌이 일정 프레임 이상 연속으로 들어왔는지 체크
+	void CheckConsecutiveCollision();
+
+	// 현재 가진 정보를 바탕으로 골프공의 최종 힘 계산
+	FVector CalculateFinalForce(float power, float precision);
+	
+	// 공이 홀컵을 바라보게 설정
+	void FaceHoleCup();
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -44,9 +88,6 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	class UArrowComponent* ArrowComp;
-
-	bool PhysicsSimulated = false;
-	bool PhysicsSimulate(bool v);
 
 	// 공 세팅시 정해지는 수치 (타구바에 따라 최종수치는 달라질수 있음)
 	UPROPERTY(EditAnywhere) // 공이 땅과 이루는 발사각, 0~90사이
@@ -88,14 +129,9 @@ public:
 	UPROPERTY(EditAnywhere)
 	float AnglularDamping_Rolling = 0.05f;
 
-	// 공의 상태: PhysicsSimulated, IsRolling, HasStopped가 차례대로 true가 되며 끝난다
-
 	// 공 치기
 	UFUNCTION()
-	bool Launch(float power, float precisionValue);
-
-	/// 샷 이후 공이 처음으로 땅에 닿았는지 여부
-	bool HasBallHitGround = false;
+	bool Launch(float powerValue, float precisionValue);
 
 	// 공이 땅에 닿을 때 감속 분모
 	UPROPERTY(EditAnywhere)
@@ -104,15 +140,9 @@ public:
 	UPROPERTY(EditAnywhere)
 	float HitGroundZVelocityDecelerationRate = 1.0f;
 
-	// 해당 프레임수 이상 연속으로 감속하지 않는다
-	UPROPERTY(EditAnywhere)
-	int HitGroundDecelerationLimitFrame = 1;
-
-	// 해당 프레임 이상 연속으로 collision이면 구르는 상태로 판정
+	// 해당 프레임 이상 연속충돌하면 구르는 상태로 판정
 	UPROPERTY(EditAnywhere)
 	int ConsecutiveCollisionFramesForRoll = 200;
-
-	bool IsRolling = false;
 
 	// 홀컵 위치
 	UPROPERTY(EditAnywhere)
@@ -122,14 +152,13 @@ public:
 	UPROPERTY(EditAnywhere)
 	float StopVelocityTheshold = 35.0f;
 
-	bool HasStopped = false;
+	//bool HasStopped = false;
 
-	UPROPERTY()
 	FOnBallStopped OnBallStopped;
 
 	// 충돌 연속 체크 확인용 변수
-	bool BallHitGroundLastFrame = false;
-	int ConsecutiveCollision = 0; //HitGroundDecelerationLimitFrame을 넘으면 더이상 감속하지 않는다
+	bool BallHitGroundLastFrame = false; // 이전 프레임에서 충돌했는지
+	int32 ConsecutiveCollision = 0; // 얼마나 연속으로 충돌했는지
 
 	UFUNCTION()
 	void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
@@ -141,15 +170,6 @@ public:
 	FVector LastLocation;
 	void Visualize();
 
-	//bool fasterSimulation = false;
-	FTransform InitialTransform;
-
-	UFUNCTION()
-	void ResetGolfBall();
-
 	// 태그
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
-
-	// 공이 홀컵을 바라보게 설정
-	void FaceHoleCup();
 };
