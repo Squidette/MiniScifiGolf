@@ -2,17 +2,12 @@
 
 
 #include "GolfBallBase.h"
-
-#include <string>
 #include "EngineUtils.h"
 #include "HoleCup.h"
 #include "../MiniScifiGolf.h"
-#include "Camera/CameraComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/ArrowComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Kismet/GameplayStatics.h"
 
 #define GOLFBALLBASE_RADIUS 3.0f
 
@@ -40,7 +35,7 @@ AGolfBallBase::AGolfBallBase()
 	{
 		SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("Collider"));
 		RootComponent = SphereComp;
-		SphereComp->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+		SphereComp->SetCollisionProfileName(TEXT("Ball"));
 		SphereComp->SetNotifyRigidBodyCollision(true);
 		SphereComp->InitSphereRadius(GOLFBALLBASE_RADIUS);
 		SphereComp->SetUseCCD(true);
@@ -65,12 +60,6 @@ AGolfBallBase::AGolfBallBase()
 		ArrowComp->SetCollisionProfileName(TEXT("NoCollision"));
 	}
 
-	if (!SpringArmComp)
-	{
-		SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-		SpringArmComp->SetupAttachment(RootComponent);
-	}
-
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshAsset(
 		TEXT("Script/Engine.StaticMesh'/Engine/BasicShapes/Sphere.Sphere'"));
 	if (MeshAsset.Succeeded())
@@ -80,11 +69,7 @@ AGolfBallBase::AGolfBallBase()
 
 	// 공 태그 붙이기
 	FGameplayTag ballTag = FGameplayTag::RequestGameplayTag(FName("Ball"));
-
-	if (!TagContainer.HasTag(ballTag))
-	{
-		TagContainer.AddTag(ballTag);
-	}
+	if (!TagContainer.HasTag(ballTag)) { TagContainer.AddTag(ballTag); }
 }
 
 void AGolfBallBase::ApplyDesiredHeadingDegree(float newValue)
@@ -118,6 +103,7 @@ void AGolfBallBase::CheckConsecutiveCollision()
 
 FVector AGolfBallBase::CalculateFinalForce(float power, float precision)
 {
+	// 공이 현재 바라보는 방향에 편차를 추가
 	FRotator Rot(0.f, DesiredHeadingDegree + precision * PrecisionRate, 0.0f);
 	FVector finalXYDirection = Rot.Vector();
 
@@ -184,7 +170,7 @@ void AGolfBallBase::OnEnterStopped()
 
 	// 델리게이트 실행
 	if (OnBallStopped.IsBound()) { OnBallStopped.Execute(); }
-	
+
 	UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
 	UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
 	       GetActorLocation().Z);
@@ -194,6 +180,7 @@ void AGolfBallBase::OnEnterStopped()
 	SphereComp->SetPhysicsAngularVelocityInRadians(FVector(0, 0, 0));
 	BallHitGroundLastFrame = false;
 	ConsecutiveCollision = 0;
+	IsPuttingMode = false; // 퍼팅은 기본값이 아니므로 꺼준다
 }
 
 void AGolfBallBase::TickStopped()
@@ -238,8 +225,7 @@ void AGolfBallBase::OnEnterRolling()
 
 void AGolfBallBase::TickRolling()
 {
-	ApplyMagnusForce();
-	CheckConsecutiveCollision();
+	if (!IsPuttingMode) ApplyMagnusForce();
 
 	// 공 멈춤 체크
 	if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
@@ -305,10 +291,6 @@ void AGolfBallBase::Tick(float DeltaTime)
 	float size = SphereComp->GetPhysicsLinearVelocity().Size();
 	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0,
 	                true, 1);
-	//DrawDebugString(GetWorld(), GetActorLocation(), SphereComp->GetComponentVelocity().ToString(), nullptr, FColor::Magenta, 0, true, 2);
-
-	DrawDebugLine(GetWorld(), GetActorLocation(), (GetActorLocation() + GetVelocity() * 100), FColor::Magenta, false,
-	              0);
 }
 
 void AGolfBallBase::TurnDirection(bool right)
@@ -336,6 +318,25 @@ bool AGolfBallBase::Launch(float powerValue, float precisionValue)
 	FVector finalForce = CalculateFinalForce(powerValue, precisionValue);
 	UE_LOG(LogTemp, Warning, TEXT("launched ball at finalforce of %s"), *finalForce.ToString());
 	SphereComp->AddImpulse(finalForce, TEXT("None"), false);
+	SphereComp->AddTorqueInRadians(TorqueAmount);
+
+	return true;
+}
+
+bool AGolfBallBase::Putt(float powerValue, float precisionValue)
+{
+	// 공이 멈춤 상태가 아니라면(이미 움직이는 상태라면) 리턴
+	if (CurrentState != EBallState::STOPPED)
+	{
+		CUSTOMLOG(TEXT("%s"), TEXT("공이 이미 움직이는 중이므로 리턴"));
+		return false;
+	}
+
+	IsPuttingMode = true;
+	
+	// 공이 현재 바라보는 방향에 편차를 추가
+	FRotator Rot(0.f, DesiredHeadingDegree + precisionValue * PrecisionRate, 0.0f);
+	SphereComp->AddImpulse(Rot.Vector() * PuttFullforce);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
 
 	return true;

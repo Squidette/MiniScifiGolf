@@ -13,6 +13,7 @@
 #include "InputMappingContext.h"
 #include "PlayerAnim.h"
 #include "Camera/CameraActor.h"
+#include "Components/CapsuleComponent.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
@@ -69,6 +70,10 @@ APlayerCharacter::APlayerCharacter()
 	if (mapVerticalInputAction.Succeeded()) IA_MapVertical = mapVerticalInputAction.Object;
 
 	bUseControllerRotationYaw = false;
+
+	// 충돌 설정
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Player"));
+	GetMesh()->SetCollisionProfileName(TEXT("NoCollision"));
 }
 
 // Called when the game starts or when spawned

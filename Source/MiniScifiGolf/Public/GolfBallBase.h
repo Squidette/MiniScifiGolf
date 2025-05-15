@@ -64,7 +64,13 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	
 	// 공이 홀컵을 바라보게 설정
 	void FaceHoleCup();
-	
+
+	// 퍼팅 관련 변수들
+	UPROPERTY(EditDefaultsOnly, Category="Putt")
+	float PuttFullforce = 100.0f;
+
+	bool IsPuttingMode = false;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -82,9 +88,6 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	class UStaticMeshComponent* StaticMeshComp;
-
-	UPROPERTY(EditAnywhere)
-	class USpringArmComponent* SpringArmComp;
 
 	UPROPERTY(EditAnywhere)
 	class UArrowComponent* ArrowComp;
@@ -129,10 +132,13 @@ public:
 	UPROPERTY(EditAnywhere)
 	float AnglularDamping_Rolling = 0.05f;
 
-	// 공 치기
+	// 일반 공 치기!
 	UFUNCTION()
 	bool Launch(float powerValue, float precisionValue);
 
+	// 퍼팅!
+	bool Putt(float powerValue, float precisionValue);
+	
 	// 공이 땅에 닿을 때 감속 분모
 	UPROPERTY(EditAnywhere)
 	float HitGroundXYVelocityDecelerationRate = 1.8f;

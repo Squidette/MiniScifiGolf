@@ -9,9 +9,9 @@ AGroundBase::AGroundBase()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("Floor");
+	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("Mesh");
 	SetRootComponent(StaticMeshComponent);
-	
+	StaticMeshComponent->SetCollisionProfileName(TEXT("Ground"));
 	// ConstructorHelpers::FObjectFinder<UStaticMesh> tempMesh(
 	// 	TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Quinn.SKM_Quinn'"));
 	//

@@ -12,8 +12,9 @@ AHoleCup::AHoleCup()
 
 	BoxComp = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComp"));
 	BoxComp->SetBoxExtent(FVector(50.0f, 50.0f, 50.0f));
+	BoxComp->SetCollisionProfileName(TEXT("HoleCup"));
 
-	// È¦ÄÅ ÅÂ±× ºÙÀÌ±â
+	// È¦ï¿½ï¿½ ï¿½Â±ï¿½ ï¿½ï¿½ï¿½Ì±ï¿½
 	FGameplayTag holeCupTag = FGameplayTag::RequestGameplayTag(FName("HoleCup"));
 
 	if (!TagContainer.HasTag(holeCupTag))
