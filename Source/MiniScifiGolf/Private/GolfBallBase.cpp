@@ -16,13 +16,13 @@ void AGolfBallBase::FaceHoleCup()
 	if (!HoleCup) return;
 
 	// 현재 방향 설정
-	FacingHoleCupVector = HoleCup->GetActorLocation() - GetActorLocation();
+	FVector FacingHoleCupVector = HoleCup->GetActorLocation() - GetActorLocation();
 	FacingHoleCupVector.Z = 0;
 	FacingHoleCupVector.Normalize();
 
 	// 현재 방향을 float 각도로 저장
 	FRotator Rot = FacingHoleCupVector.Rotation();
-	ApplyDesiredHeadingDegree(Rot.Yaw);
+	UpdateCurrentYawDegree(Rot.Yaw);
 }
 
 // Sets default values
@@ -39,8 +39,8 @@ AGolfBallBase::AGolfBallBase()
 		SphereComp->SetNotifyRigidBodyCollision(true);
 		SphereComp->InitSphereRadius(GOLFBALLBASE_RADIUS);
 		SphereComp->SetUseCCD(true);
-		SphereComp->SetLinearDamping(LinearDamping_Initial);
-		SphereComp->SetAngularDamping(AngularDamping_Initial);
+		SphereComp->SetLinearDamping(LinearDamping_InAir);
+		SphereComp->SetAngularDamping(AngularDamping_InAir);
 	}
 
 	if (!StaticMeshComp)
@@ -72,15 +72,15 @@ AGolfBallBase::AGolfBallBase()
 	if (!TagContainer.HasTag(ballTag)) { TagContainer.AddTag(ballTag); }
 }
 
-void AGolfBallBase::ApplyDesiredHeadingDegree(float newValue)
+void AGolfBallBase::UpdateCurrentYawDegree(float newValue)
 {
-	DesiredHeadingDegree = newValue;
-	SetActorRotation(FRotator(0.f, DesiredHeadingDegree, 0.f));
+	CurrentYawDegree = newValue;
+	SetActorRotation(FRotator(0.f, CurrentYawDegree, 0.f));
 }
 
+// 마그누스 효과 적용
 void AGolfBallBase::ApplyMagnusForce(bool ignoreZ)
 {
-	// 마그누스 효과
 	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
 		SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
 	if (ignoreZ) MagnusForce.Z = 0.0f; // 공이 물수제비 하는 것을 막아보기 위해 추가
@@ -104,7 +104,7 @@ void AGolfBallBase::CheckConsecutiveCollision()
 FVector AGolfBallBase::CalculateFinalForce(float power, float precision)
 {
 	// 공이 현재 바라보는 방향에 편차를 추가
-	FRotator Rot(0.f, DesiredHeadingDegree + precision * PrecisionRate, 0.0f);
+	FRotator Rot(0.f, CurrentYawDegree + precision * PrecisionRate, 0.0f);
 	FVector finalXYDirection = Rot.Vector();
 
 	// 힘 계산
@@ -218,16 +218,24 @@ void AGolfBallBase::TickBouncing()
 
 void AGolfBallBase::OnEnterRolling()
 {
+	if (!SphereComp) return;
+
 	// 구르기 진입시 Damping값을 바꾼다
-	if (SphereComp)
+	if (!IsPuttingMode)
 	{
 		SphereComp->SetLinearDamping(LinearDamping_Rolling);
-		SphereComp->SetAngularDamping(AnglularDamping_Rolling);
+		SphereComp->SetAngularDamping(AngularDamping_Rolling);
+	}
+	else // 퍼팅시에는 퍼팅 전용 Damping 적용
+	{
+		SphereComp->SetLinearDamping(LinearDamping_Putt);
+		SphereComp->SetAngularDamping(AngularDamping_Putt);
 	}
 }
 
 void AGolfBallBase::TickRolling()
 {
+	CheckConsecutiveCollision();
 	if (!IsPuttingMode) ApplyMagnusForce();
 }
 
@@ -305,8 +313,8 @@ void AGolfBallBase::Tick(float DeltaTime)
 void AGolfBallBase::TurnDirection(bool right)
 {
 	float changeAmount = HeadDegreeTurnSpeed * GetWorld()->GetDeltaSeconds();
-	if (right) { ApplyDesiredHeadingDegree(DesiredHeadingDegree + changeAmount); }
-	else { ApplyDesiredHeadingDegree(DesiredHeadingDegree - changeAmount); }
+	if (right) { UpdateCurrentYawDegree(CurrentYawDegree + changeAmount); }
+	else { UpdateCurrentYawDegree(CurrentYawDegree - changeAmount); }
 }
 
 // 공 치기!
@@ -342,9 +350,10 @@ bool AGolfBallBase::Putt(float powerValue, float precisionValue)
 	}
 
 	IsPuttingMode = true;
+	SetState(EBallState::ROLLING);
 
 	// 공이 현재 바라보는 방향에 편차를 추가
-	FRotator Rot(0.f, DesiredHeadingDegree + precisionValue * PrecisionRate, 0.0f);
+	FRotator Rot(0.f, CurrentYawDegree + precisionValue * PrecisionRate, 0.0f);
 	SphereComp->AddImpulse(Rot.Vector() * PuttFullforce);
 	SphereComp->AddTorqueInRadians(TorqueAmount);
 
@@ -375,7 +384,7 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 		adjustedVel.Y = adjustedVel.Y / HitGroundXYVelocityDecelerationRate;
 		adjustedVel.Z = adjustedVel.Z / HitGroundZVelocityDecelerationRate;
 		SphereComp->SetPhysicsLinearVelocity(adjustedVel);
-		UE_LOG(LogTemp, Warning, TEXT("충돌로 인한 감속"));
+		UE_LOG(LogTemp, Warning, TEXT("충돌로 인한 감속, ConsecutiveCollision %d"), ConsecutiveCollision);
 	}
 
 	// Flying -> Bouncing
@@ -397,11 +406,22 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 	// Rolling -> Stopped
 	else if (CurrentState == EBallState::ROLLING)
 	{
+		bool stop = false;
+
 		// 공 멈춤 체크
-		if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
+		if (IsPuttingMode)
+		{
+			if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityThreshold_Putt) stop = true;
+		}
+		else
+		{
+			if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityThreshold) stop = true;
+		}
+
+		if (stop)
 		{
 			SetState(EBallState::STOPPED);
-			SetCurrentGroundType(OtherComp);
+			SetCurrentGroundType(OtherComp); // 지형 감지
 		}
 	}
 

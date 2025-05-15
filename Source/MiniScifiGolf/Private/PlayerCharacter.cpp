@@ -381,20 +381,42 @@ void APlayerCharacter::ShotBall()
 	if (!TempSuccess)
 	{
 		// 랜덤한 작은 파워로, 랜덤한 방향으로 치게된다
-		TempPower = FMath::RandRange(0.01f, 0.2f);
+		TempPower = FMath::RandRange(0.01f, 0.1f);
 		TempDir = FMath::RandRange(-1.0f, 1.0f);
-		CUSTOMLOG(TEXT("실패 샷 - 랜덤한 %f의 힘, %f의 정확도로 설정되어 Ball->Launch"), TempPower, TempDir);
+		CUSTOMLOG(TEXT("실패 샷 - 랜덤한 %f의 힘, %f의 정확도로 재설정됨"), TempPower, TempDir);
 	}
 	else CUSTOMLOG(TEXT("타구바에서 전달된 %f의 힘, %f의 정확도로 Ball->Launch"), TempPower, TempDir);
+	
+	DettachPlayerAndCameraFromBall();
 
-	if (Ball->Launch(TempPower, TempDir))
+	// 그린 위면 퍼팅
+	if (Ball->GetCurrentGroundType() == EGroundType::GREEN)
 	{
-		SetCurrentState(EPlayerState::FLYBALL);
-		FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+		Anim->SetShotAnim(EShotAnims::PUTT);
+
+		if (Ball->Putt(TempPower, TempDir))
+		{
+			SetCurrentState(EPlayerState::FLYBALL);
+		}
+		else
+		{
+			CUSTOMLOG(TEXT("Ball Putt 실패"), TempPower, TempDir);
+		}
 	}
+	// 그린이 아니면 일반 샷
 	else
 	{
-		CUSTOMLOG(TEXT("Ball Launch 실패함"), TempPower, TempDir);
+		Anim->SetShotAnim(EShotAnims::DRIVE);
+
+		if (Ball->Launch(TempPower, TempDir))
+		{
+			SetCurrentState(EPlayerState::FLYBALL);
+			FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
+		}
+		else
+		{
+			CUSTOMLOG(TEXT("Ball Launch 실패"), TempPower, TempDir);
+		}
 	}
 }
 
@@ -415,7 +437,6 @@ void APlayerCharacter::SetCurrentState(EPlayerState newState)
 		AttachPlayerAndCameraToBall();
 		break;
 	case EPlayerState::FLYBALL:
-		DettachPlayerAndCameraFromBall();
 		break;
 	default:
 		break;
@@ -442,5 +463,6 @@ void APlayerCharacter::OnShotAnimationEnd()
 void APlayerCharacter::OnBallHitAnimation()
 {
 	SetCurrentState(EPlayerState::FLYBALL);
+
 	ShotBall();
 }

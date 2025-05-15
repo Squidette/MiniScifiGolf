@@ -37,7 +37,7 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	UPROPERTY()
 	FGameplayTagContainer TagContainer;
 
-	// FSM
+	/// [FSM] ------------------------------------------------------------------------
 	UPROPERTY(VisibleAnywhere)
 	EBallState CurrentState = EBallState::ROLLING; // STOPPED가 아닌 아무거나로 초기화
 	void SetState(EBallState newState);
@@ -58,35 +58,70 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	// 공이 땅에서 굴러가고 있는 상태
 	void OnEnterRolling();
 	void TickRolling();
+	///-------------------------------------------------------------------------------
 	
+
+	/// [샷 준비시 공 컨트롤 관련] -----------------------------------------------------
+	// 공 좌우로 돌리는 속도
+	UPROPERTY(EditDefaultsOnly)
+	float HeadDegreeTurnSpeed = 30.0f;
+
 	// 현재 공의 앞방향 (XY축)
-	float DesiredHeadingDegree;
-	void ApplyDesiredHeadingDegree(float newValue);
+	float CurrentYawDegree;
+	void UpdateCurrentYawDegree(float newValue);
 
-	// 마그누스 효과 적용
-	void ApplyMagnusForce(bool ignoreZ = false);
-
-	// 충돌이 일정 프레임 이상 연속으로 들어왔는지 체크
-	void CheckConsecutiveCollision();
-
-	// 현재 가진 정보를 바탕으로 골프공의 최종 힘 계산
-	FVector CalculateFinalForce(float power, float precision);
-	
 	// 공이 홀컵을 바라보게 설정
 	void FaceHoleCup();
 
+	// 마지막 샷 위치 기록
+	FVector LastShotPosition = FVector::ZeroVector;
+	///-------------------------------------------------------------------------------
+
+
+	/// [샷 시작시 필요한 것들] --------------------------------------------------------
+	// 현재 가진 정보를 바탕으로 골프공의 최종 힘 계산
+	FVector CalculateFinalForce(float power, float precision);
+
 	// 퍼팅 관련 변수들
-	UPROPERTY(EditDefaultsOnly, Category="Putt")
-	float PuttFullforce = 100.0f;
+	UPROPERTY(EditAnywhere, Category = "Putt")
+	float PuttFullforce = 900.0f;
 
 	bool IsPuttingMode = false;
+	///-------------------------------------------------------------------------------
 
-	// 마지막 샷 위치
-	FVector LastShotPosition = FVector::ZeroVector;
 
-	// 공이 위치한 지형 타입
+	/// [샷 도중 필요한 것들] ----------------------------------------------------------
+	// 충돌이 일정 프레임 이상 연속으로 들어왔는지 체크
+	void CheckConsecutiveCollision();
+	
+	// 공이 현재 위치한 지형
 	EGroundType CurrentGroundType = EGroundType::ROUGH;
-	void SetCurrentGroundType(UPrimitiveComponent* hitGroundComp);
+	void SetCurrentGroundType(UPrimitiveComponent* hitGroundComp); // 공이 멈추는 순간 실행
+	
+	// 마그누스 효과
+	UPROPERTY(EditAnywhere)
+	float MagnusScalar = 0.01f;
+	void ApplyMagnusForce(bool ignoreZ = false);
+
+	// 공 상태별 Damping값
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_InAir = 0.6f;
+
+	UPROPERTY(EditAnywhere)
+	float AngularDamping_InAir = 0.05f;
+
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_Rolling = 0.6f;
+
+	UPROPERTY(EditAnywhere)
+	float AngularDamping_Rolling = 0.05f;
+
+	UPROPERTY(EditAnywhere)
+	float LinearDamping_Putt = 0.1f;
+
+	UPROPERTY(EditAnywhere)
+	float AngularDamping_Putt = 0.1f;
+	///-------------------------------------------------------------------------------
 
 protected:
 	// Called when the game starts or when spawned
@@ -120,41 +155,7 @@ public:
 	float PrecisionRate = 5.0f; // 샷의 정확도 (양수, 0에 가까워질수록 정확해짐)
 
 	UPROPERTY(EditAnywhere)
-	float HeadDegreeTurnSpeed = 30.0f;
-
-	// 공 방향 바꾸기
-	void TurnDirection(bool right);
-
-	UPROPERTY(EditAnywhere) // 공이 현재 바라보는 방향으로, Z=0이고 Normalized
-	FVector FacingHoleCupVector;
-
-	//FVector ImpulseAmount; // 벡터로 변환된 공 발사방향
-
-	UPROPERTY(EditAnywhere)
 	FVector TorqueAmount;
-
-	// 마그누스 효과 관련
-	UPROPERTY(EditAnywhere)
-	float MagnusScalar = 0.01f;
-
-	UPROPERTY(EditAnywhere)
-	float LinearDamping_Initial = 0.6f;
-
-	UPROPERTY(EditAnywhere)
-	float LinearDamping_Rolling = 0.6f;
-
-	UPROPERTY(EditAnywhere)
-	float AngularDamping_Initial = 0.05f;
-
-	UPROPERTY(EditAnywhere)
-	float AnglularDamping_Rolling = 0.05f;
-
-	// 일반 공 치기!
-	UFUNCTION()
-	bool Launch(float powerValue, float precisionValue);
-
-	// 퍼팅!
-	bool Putt(float powerValue, float precisionValue);
 	
 	// 공이 땅에 닿을 때 감속 분모
 	UPROPERTY(EditAnywhere)
@@ -171,9 +172,13 @@ public:
 	UPROPERTY(EditAnywhere)
 	class AHoleCup* HoleCup;
 
-	// 공의 정지
+	// 속도가 이 값 아래로 내려가면 정지
 	UPROPERTY(EditAnywhere)
-	float StopVelocityTheshold = 35.0f;
+	float StopVelocityThreshold = 55.0f;
+
+	// 속도가 이 값 아래로 내려가면 정지
+	UPROPERTY(EditAnywhere)
+	float StopVelocityThreshold_Putt = 55.0f;
 
 	//bool HasStopped = false;
 
@@ -195,4 +200,15 @@ public:
 
 	// 태그
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
+
+	inline EGroundType GetCurrentGroundType() const { return CurrentGroundType; }
+
+	// 일반 공 치기!
+	bool Launch(float powerValue, float precisionValue);
+
+	// 퍼팅!
+	bool Putt(float powerValue, float precisionValue);
+
+	// 공 방향 돌리기
+	void TurnDirection(bool right);
 };
