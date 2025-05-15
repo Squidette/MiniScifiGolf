@@ -82,7 +82,7 @@ void AGolfBallBase::ApplyMagnusForce(bool ignoreZ)
 {
 	// 마그누스 효과
 	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
-	                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+		SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
 	if (ignoreZ) MagnusForce.Z = 0.0f; // 공이 물수제비 하는 것을 막아보기 위해 추가
 	SphereComp->AddForce(MagnusForce);
 }
@@ -164,6 +164,9 @@ void AGolfBallBase::OnEnterStopped()
 	// 바라보는 방향 초기화
 	FaceHoleCup();
 
+	// 정지한 위치 기록
+	LastShotPosition = GetActorLocation();
+
 	// 시뮬레이션 끄기
 	SphereComp->SetSimulatePhysics(false);
 	if (SphereComp) { SphereComp->OnComponentHit.RemoveDynamic(this, &AGolfBallBase::OnCollision); }
@@ -173,7 +176,7 @@ void AGolfBallBase::OnEnterStopped()
 
 	UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
 	UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
-	       GetActorLocation().Z);
+		GetActorLocation().Z);
 
 	// 공 속도와 임시변수들 초기화
 	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
@@ -226,12 +229,18 @@ void AGolfBallBase::OnEnterRolling()
 void AGolfBallBase::TickRolling()
 {
 	if (!IsPuttingMode) ApplyMagnusForce();
+}
 
-	// 공 멈춤 체크
-	if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
-	{
-		SetState(EBallState::STOPPED);
-	}
+void AGolfBallBase::SetCurrentGroundType(UPrimitiveComponent* comp)
+{
+	if (comp->ComponentHasTag(TEXT("Fairway"))) { CurrentGroundType = EGroundType::FAIRWAY; }
+	else if (comp->ComponentHasTag(TEXT("Green"))) { CurrentGroundType = EGroundType::GREEN; }
+	else if (comp->ComponentHasTag(TEXT("Rough"))) { CurrentGroundType = EGroundType::ROUGH; }
+	else if (comp->ComponentHasTag(TEXT("Bunker"))) { CurrentGroundType = EGroundType::BUNKER; }
+	else if (comp->ComponentHasTag(TEXT("OB"))) { CurrentGroundType = EGroundType::OB; }
+	else UE_LOG(LogTemp, Warning, TEXT("현재 지형의 태그가 파악되지 않음"));
+
+	UE_LOG(LogTemp, Warning, TEXT("공이 %s 지형에 멈춤"), *UEnum::GetValueAsString(CurrentGroundType));
 }
 
 // Called when the game starts or when spawned
@@ -290,7 +299,7 @@ void AGolfBallBase::Tick(float DeltaTime)
 	// 디버그 스트링
 	float size = SphereComp->GetPhysicsLinearVelocity().Size();
 	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0,
-	                true, 1);
+		true, 1);
 }
 
 void AGolfBallBase::TurnDirection(bool right)
@@ -333,7 +342,7 @@ bool AGolfBallBase::Putt(float powerValue, float precisionValue)
 	}
 
 	IsPuttingMode = true;
-	
+
 	// 공이 현재 바라보는 방향에 편차를 추가
 	FRotator Rot(0.f, DesiredHeadingDegree + precisionValue * PrecisionRate, 0.0f);
 	SphereComp->AddImpulse(Rot.Vector() * PuttFullforce);
@@ -352,9 +361,9 @@ void AGolfBallBase::Visualize()
 }
 
 void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor,
-                                UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	UE_LOG(LogTemp, Warning, TEXT("AGolfBallBase::OnCollision: %s"), *OtherActor->GetActorNameOrLabel());
+	//UE_LOG(LogTemp, Warning, TEXT("AGolfBallBase::OnCollision: %s"), *OtherActor->GetActorNameOrLabel());
 
 	if (CurrentState == EBallState::STOPPED) return;
 
@@ -376,7 +385,6 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 		UE_LOG(LogTemp, Warning, TEXT("비거리: %f, %f, %f"), Hit.Location.X, Hit.Location.Y, Hit.Location.Z);
 		SetState(EBallState::BOUNCING);
 	}
-
 	// Bouncing -> Rolling
 	else if (CurrentState == EBallState::BOUNCING)
 	{
@@ -384,6 +392,16 @@ void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* Other
 		if (ConsecutiveCollision >= ConsecutiveCollisionFramesForRoll)
 		{
 			SetState(EBallState::ROLLING);
+		}
+	}
+	// Rolling -> Stopped
+	else if (CurrentState == EBallState::ROLLING)
+	{
+		// 공 멈춤 체크
+		if (SphereComp->GetPhysicsLinearVelocity().Size() < StopVelocityTheshold)
+		{
+			SetState(EBallState::STOPPED);
+			SetCurrentGroundType(OtherComp);
 		}
 	}
 

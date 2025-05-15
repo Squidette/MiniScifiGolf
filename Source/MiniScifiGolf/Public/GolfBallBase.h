@@ -16,6 +16,16 @@ enum class EBallState : uint8
 	ROLLING
 };
 
+UENUM(BlueprintType)
+enum class EGroundType : uint8
+{
+	FAIRWAY,
+	ROUGH,
+	BUNKER,
+	GREEN,
+	OB
+};
+
 DECLARE_DELEGATE(FOnBallStopped);
 
 UCLASS()
@@ -70,6 +80,13 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	float PuttFullforce = 100.0f;
 
 	bool IsPuttingMode = false;
+
+	// 마지막 샷 위치
+	FVector LastShotPosition = FVector::ZeroVector;
+
+	// 공이 위치한 지형 타입
+	EGroundType CurrentGroundType = EGroundType::ROUGH;
+	void SetCurrentGroundType(UPrimitiveComponent* hitGroundComp);
 
 protected:
 	// Called when the game starts or when spawned
