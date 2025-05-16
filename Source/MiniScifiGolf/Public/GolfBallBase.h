@@ -100,6 +100,9 @@ class MINISCIFIGOLF_API AGolfBallBase : public AActor
 	
 	// 마그누스 효과
 	UPROPERTY(EditAnywhere)
+	bool bApplyMagnusForce = true;
+	
+	UPROPERTY(EditAnywhere)
 	float MagnusScalar = 0.01f;
 	void ApplyMagnusForce(bool ignoreZ = false);
 

@@ -65,7 +65,12 @@ void UFieldWidget::SetPower()
 {
 	if (ShotBarValue > FIELDWIDGET_SPINBARRATIO)
 	{
-		PowerValue = ShotBarValue;
+		//PowerValue = ShotBarValue;
+		PowerValue = FMath::GetMappedRangeValueClamped(
+			FVector2D(FIELDWIDGET_SPINBARRATIO, 1.0f),
+			FVector2D(0.0f, 1.0f),
+			ShotBarValue
+		);
 	}
 	else
 	{
@@ -84,7 +89,7 @@ void UFieldWidget::SetPrecision()
 			FVector2D(0.0f, FIELDWIDGET_SPINBARRATIO),
 			FVector2D(-1.0f, 1.0f),
 			ShotBarValue
-			);
+		);
 	}
 	else
 	{
@@ -119,7 +124,7 @@ void UFieldWidget::UpdateShotBar(const float& dt)
 
 			if (ShotFail) { CUSTOMLOG(TEXT("샷 실패")); }
 			else { CUSTOMLOG(TEXT("타구바 비활성화됨, %f의 힘,  %f의 정확도"), PowerValue, PrecisionValue); }
-			
+
 			// 샷에서 정해진 정보를 발송
 			OnShotBarEnded.Execute(!ShotFail, PowerValue, PrecisionValue);
 		}

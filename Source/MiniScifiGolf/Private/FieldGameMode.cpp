@@ -8,6 +8,7 @@
 #include "BallCamera.h"
 #include "EngineUtils.h"
 #include "MapCamera.h"
+#include "ResultWidget.h"
 #include "../MiniScifiGolf.h"
 
 void AFieldGameMode::BeginPlay()
@@ -17,11 +18,22 @@ void AFieldGameMode::BeginPlay()
 	// 위젯 생성
 	if (FieldWidgetFactory)
 	{
-		FieldWidget = Cast<UFieldWidget>(CreateWidget(GetWorld(), FieldWidgetFactory));
+		FieldWidget = CreateWidget<UFieldWidget>(GetWorld(), FieldWidgetFactory);
 
 		if (FieldWidget)
 		{
 			FieldWidget->AddToViewport();
+		}
+	}
+
+	if (ResultWidgetFactory)
+	{
+		ResultWidget = CreateWidget<UResultWidget>(GetWorld(), ResultWidgetFactory);
+
+		if (ResultWidget)
+		{
+			ResultWidget->UnShow();
+			ResultWidget->AddToViewport();
 		}
 	}
 
@@ -151,3 +163,7 @@ ACameraActor* AFieldGameMode::GetCameraActorByMode(ECameraMode mode) const
 		return nullptr;
 	}
 }
+
+int AFieldGameMode::GetFieldPar() const { return Par; }
+int AFieldGameMode::GetCurrentShots() const { return CurrentShots; }
+void AFieldGameMode::IncrementCurrentShots() { CurrentShots++; }

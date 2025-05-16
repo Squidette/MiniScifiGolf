@@ -2,7 +2,12 @@
 
 
 #include "HoleCup.h"
+
+#include "FieldGameMode.h"
+#include "GolfBallBase.h"
+#include "ResultWidget.h"
 #include "Components/BoxComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AHoleCup::AHoleCup()
@@ -11,12 +16,13 @@ AHoleCup::AHoleCup()
 	PrimaryActorTick.bCanEverTick = true;
 
 	BoxComp = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComp"));
+	SetRootComponent(BoxComp);
 	BoxComp->SetBoxExtent(FVector(50.0f, 50.0f, 50.0f));
 	BoxComp->SetCollisionProfileName(TEXT("HoleCup"));
 
-	// Ȧ�� �±� ���̱�
+	// 홀컵 태그 붙이기
 	FGameplayTag holeCupTag = FGameplayTag::RequestGameplayTag(FName("HoleCup"));
-
+	
 	if (!TagContainer.HasTag(holeCupTag))
 	{
 		TagContainer.AddTag(holeCupTag);
@@ -27,12 +33,27 @@ AHoleCup::AHoleCup()
 void AHoleCup::BeginPlay()
 {
 	Super::BeginPlay();
+
+	BoxComp->OnComponentBeginOverlap.AddDynamic(this, &AHoleCup::OnBallCollision);
 }
 
 // Called every frame
 void AHoleCup::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
+void AHoleCup::OnBallCollision(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	// 볼 태그가 있는지 확인
+	//if (OtherActor)
+
+	AGolfBallBase* golfBall = Cast<AGolfBallBase>(OtherActor);
+	if (golfBall)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("골프공이 닿았습니다"));
+		auto* gm = Cast<AFieldGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+		if (gm) gm->ResultWidget->Show();
+	}
+}

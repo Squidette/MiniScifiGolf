@@ -344,7 +344,6 @@ void APlayerCharacter::OnShotMade(bool success, float power, float dir)
 	TempSuccess = success;
 	TempPower = power;
 	TempDir = dir;
-
 }
 
 bool APlayerCharacter::OpenMap()
@@ -392,11 +391,10 @@ void APlayerCharacter::ShotBall()
 	// 그린 위면 퍼팅
 	if (Ball->GetCurrentGroundType() == EGroundType::GREEN)
 	{
-		Anim->SetShotAnim(EShotAnims::PUTT);
-
-		if (Ball->Putt(TempPower, TempDir))
+		if (Ball->Putt(TempPower, 0.0f)) // 테스트용으로 퍼팅 방향 정확도를 풀로 맞춰둠
 		{
 			SetCurrentState(EPlayerState::FLYBALL);
+			FieldGameModeBase->SetCameraModeWithBlend(ECameraMode::BALL);
 		}
 		else
 		{
@@ -406,8 +404,6 @@ void APlayerCharacter::ShotBall()
 	// 그린이 아니면 일반 샷
 	else
 	{
-		Anim->SetShotAnim(EShotAnims::DRIVE);
-
 		if (Ball->Launch(TempPower, TempDir))
 		{
 			SetCurrentState(EPlayerState::FLYBALL);
@@ -435,6 +431,10 @@ void APlayerCharacter::SetCurrentState(EPlayerState newState)
 		break;
 	case EPlayerState::SHOTPREP:
 		AttachPlayerAndCameraToBall();
+		break;
+	case EPlayerState::SHOT:
+		if (Ball->GetCurrentGroundType() == EGroundType::GREEN) Anim->SetShotAnim(EShotAnims::PUTT);
+		else Anim->SetShotAnim(EShotAnims::DRIVE);
 		break;
 	case EPlayerState::FLYBALL:
 		break;

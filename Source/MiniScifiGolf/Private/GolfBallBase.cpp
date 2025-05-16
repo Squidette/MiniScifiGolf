@@ -81,10 +81,14 @@ void AGolfBallBase::UpdateCurrentYawDegree(float newValue)
 // 마그누스 효과 적용
 void AGolfBallBase::ApplyMagnusForce(bool ignoreZ)
 {
-	FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
-		SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
-	if (ignoreZ) MagnusForce.Z = 0.0f; // 공이 물수제비 하는 것을 막아보기 위해 추가
-	SphereComp->AddForce(MagnusForce);
+	if (bApplyMagnusForce)
+	{
+		// will this make a difference?
+		FVector MagnusForce = FVector::CrossProduct(SphereComp->GetPhysicsLinearVelocity(),
+		                                            SphereComp->GetPhysicsAngularVelocityInRadians() * MagnusScalar);
+		if (ignoreZ) MagnusForce.Z = 0.0f; // 공이 물수제비 하는 것을 막아보기 위해 추가
+		SphereComp->AddForce(MagnusForce);
+	}
 }
 
 void AGolfBallBase::CheckConsecutiveCollision()
@@ -176,7 +180,7 @@ void AGolfBallBase::OnEnterStopped()
 
 	UE_LOG(LogTemp, Warning, TEXT("공 멈춤, 순간 velocity %f"), SphereComp->GetPhysicsLinearVelocity().Size());
 	UE_LOG(LogTemp, Warning, TEXT("최종 거리: %f, %f, %f"), GetActorLocation().X, GetActorLocation().Y,
-		GetActorLocation().Z);
+	       GetActorLocation().Z);
 
 	// 공 속도와 임시변수들 초기화
 	SphereComp->SetPhysicsLinearVelocity(FVector(0, 0, 0));
@@ -236,7 +240,6 @@ void AGolfBallBase::OnEnterRolling()
 void AGolfBallBase::TickRolling()
 {
 	CheckConsecutiveCollision();
-	if (!IsPuttingMode) ApplyMagnusForce();
 }
 
 void AGolfBallBase::SetCurrentGroundType(UPrimitiveComponent* comp)
@@ -307,7 +310,7 @@ void AGolfBallBase::Tick(float DeltaTime)
 	// 디버그 스트링
 	float size = SphereComp->GetPhysicsLinearVelocity().Size();
 	DrawDebugString(GetWorld(), GetActorLocation(), *FString::Printf(TEXT("%.2f"), size), nullptr, FColor::Magenta, 0,
-		true, 1);
+	                true, 1);
 }
 
 void AGolfBallBase::TurnDirection(bool right)
@@ -370,7 +373,7 @@ void AGolfBallBase::Visualize()
 }
 
 void AGolfBallBase::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+                                UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	//UE_LOG(LogTemp, Warning, TEXT("AGolfBallBase::OnCollision: %s"), *OtherActor->GetActorNameOrLabel());
 

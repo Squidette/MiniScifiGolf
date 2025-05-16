@@ -28,6 +28,10 @@ private:
 	UPROPERTY()
 	FGameplayTagContainer TagContainer;
 
+	UFUNCTION()
+	void OnBallCollision(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	                     int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
 public:
 	const FGameplayTagContainer& GetTagContainer() { return TagContainer; }
 

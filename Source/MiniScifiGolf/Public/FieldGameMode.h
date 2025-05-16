@@ -28,7 +28,10 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 
 	// UI
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<class UUserWidget> FieldWidgetFactory;
+	TSubclassOf<class UFieldWidget> FieldWidgetFactory;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<class UResultWidget> ResultWidgetFactory;
 
 	// 카메라
 	ECameraMode CurrentCameraState = ECameraMode::NONE;
@@ -43,6 +46,13 @@ class MINISCIFIGOLF_API AFieldGameMode : public AGameModeBase
 	class AMapCamera* MapCamera;
 
 	bool CheckValidCamera(ECameraMode mode, AActor*& cameraActor);
+	
+	// 점수
+	int Par = 4;			// 현재 맵의 기존 파
+	int CurrentShots = 0;	// 현재 탸수
+
+	// 현재 맵의 이름
+	FString MapName = TEXT("연습용 필드");
 
 public:
 	bool SetCameraMode(ECameraMode mode);
@@ -51,10 +61,17 @@ public:
 	UPROPERTY()
 	class UFieldWidget* FieldWidget;
 
+	UPROPERTY()
+	class UResultWidget* ResultWidget;
+
 	void MoveMapCameraVertical(float v);
 	void MoveMapCameraHorizontal(float v);
 
 	const ACameraActor* GetPlayerCamera() const { return PlayerCamera; }
+
+	int GetFieldPar() const;
+	int GetCurrentShots() const;
+	void IncrementCurrentShots();
 
 private:
 	UPROPERTY(EditAnywhere)
